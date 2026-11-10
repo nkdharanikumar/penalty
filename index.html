@@ -1,0 +1,2976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PENALTY ARENA — 2-Player Online Shootout</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --font-display: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+      background-color: #050914;
+      color: #f8fafc;
+      font-family: var(--font-sans);
+      user-select: none;
+    }
+
+    .font-display {
+      font-family: var(--font-display);
+      letter-spacing: 0.04em;
+    }
+
+    /* Stadium spotlight atmospheric background */
+    .stadium-bg {
+      background:
+        radial-gradient(ellipse 75% 45% at 20% 0%, rgba(56, 189, 248, 0.16), transparent 65%),
+        radial-gradient(ellipse 75% 45% at 80% 0%, rgba(16, 185, 129, 0.14), transparent 65%),
+        radial-gradient(ellipse 90% 50% at 50% 100%, rgba(6, 78, 59, 0.35), transparent 70%),
+        linear-gradient(180deg, #040814 0%, #091224 55%, #071915 100%);
+    }
+
+    .glass-panel {
+      background: rgba(10, 18, 34, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+    }
+
+    .scorebug-glass {
+      background: linear-gradient(135deg, rgba(8, 15, 30, 0.92), rgba(15, 23, 42, 0.86));
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+      50% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+    }
+
+    .pulse-ring {
+      animation: pulseGlow 1.8s infinite;
+    }
+
+    @keyframes bannerPop {
+      0% { opacity: 0; transform: scale(0.7) translateY(16px); }
+      18% { opacity: 1; transform: scale(1.06) translateY(0); }
+      30% { transform: scale(1) translateY(0); }
+      85% { opacity: 1; transform: scale(1) translateY(0); }
+      100% { opacity: 0; transform: scale(0.95) translateY(-14px); }
+    }
+
+    .animate-banner {
+      animation: bannerPop 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    @keyframes suddenDeathPulse {
+      0%, 100% { transform: scale(1); text-shadow: 0 0 24px rgba(239, 68, 68, 0.8); }
+      50% { transform: scale(1.05); text-shadow: 0 0 40px rgba(250, 204, 21, 0.95); }
+    }
+
+    .sudden-death-text {
+      animation: suddenDeathPulse 0.9s ease-in-out infinite;
+    }
+
+    @keyframes screenShake {
+      0%, 100% { transform: translate(0, 0); }
+      15% { transform: translate(-7px, 5px); }
+      30% { transform: translate(7px, -6px); }
+      45% { transform: translate(-6px, -4px); }
+      60% { transform: translate(5px, 6px); }
+      75% { transform: translate(-4px, 2px); }
+    }
+
+    .shake-screen {
+      animation: screenShake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 999px; }
+
+    /* Tactile game buttons */
+    .tactical-btn {
+      transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+    }
+    .tactical-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+    }
+    .tactical-btn:active:not(:disabled) {
+      transform: translateY(1px) scale(0.98);
+    }
+    .tactical-btn:disabled {
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body class="stadium-bg text-slate-100 antialiased">
+
+  <!-- GLOBAL TOP-RIGHT HUD (Sound & Connection Pill) -->
+  <div class="fixed top-3 right-3 z-50 flex items-center gap-2">
+    <div id="global-conn-pill" class="hidden items-center gap-2 px-3 py-1.5 rounded-full scorebug-glass text-xs font-semibold text-slate-200">
+      <span id="global-conn-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      <span id="global-conn-text">Connected</span>
+    </div>
+    <button id="mute-btn" type="button" title="Toggle Sound"
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-full scorebug-glass hover:border-emerald-400/50 text-xs font-semibold text-slate-200 transition cursor-pointer">
+      <span id="mute-icon">🔊</span>
+      <span id="mute-label" class="hidden sm:inline">Sound On</span>
+    </button>
+  </div>
+
+  <!-- =========================================================
+       SCREEN 1: MAIN LOBBY (CREATE / JOIN WITH CUSTOM PASSWORD)
+       ========================================================= -->
+  <main id="screen-lobby" class="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+    <!-- Decorative Pitch Lines -->
+    <div class="pointer-events-none absolute inset-0 opacity-20">
+      <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[700px] h-[260px] border-2 border-emerald-400/40 rounded-t-full"></div>
+      <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-emerald-300/60 rounded-full translate-y-1/2"></div>
+    </div>
+
+    <div class="w-full max-w-xl z-10">
+      <!-- Header Brand -->
+      <div class="text-center mb-6 sm:mb-8">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs font-bold uppercase tracking-widest mb-3">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          Live WebRTC 1v1 Shootout
+        </div>
+        <h1 class="font-display text-6xl sm:text-7xl tracking-wider text-white drop-shadow-[0_6px_24px_rgba(16,185,129,0.35)] leading-none">
+          PENALTY <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">ARENA</span>
+        </h1>
+        <p class="text-slate-400 text-sm sm:text-base mt-2 max-w-md mx-auto">
+          Set a secret match password, customize your kit, outsmart the keeper, and unleash your signature celebration.
+        </p>
+      </div>
+
+      <!-- Main Card -->
+      <div class="glass-panel rounded-3xl p-5 sm:p-8">
+        <!-- Mode Switcher Tabs -->
+        <div class="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-slate-950/70 border border-white/10 mb-6">
+          <button id="tab-create" type="button"
+            class="py-3 px-4 rounded-xl font-bold text-sm sm:text-base transition cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/20">
+            ⚽ Create Match
+          </button>
+          <button id="tab-join" type="button"
+            class="py-3 px-4 rounded-xl font-bold text-sm sm:text-base transition cursor-pointer text-slate-300 hover:text-white hover:bg-white/5">
+            🔗 Join Match
+          </button>
+        </div>
+
+        <!-- CREATE MATCH PANEL -->
+        <div id="panel-create" class="space-y-4">
+          <div>
+            <label for="create-password" class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">
+              Set Custom Room Password <span class="text-slate-500 font-normal">(Alphanumeric, max 10 chars)</span>
+            </label>
+            <div class="relative">
+              <input id="create-password" type="text" maxlength="10" autocomplete="off" spellcheck="false"
+                placeholder="e.g. CR7GOAT or clasico99"
+                class="w-full px-4 py-3.5 rounded-xl bg-slate-950/80 border border-slate-700/80 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/25 outline-none text-lg font-bold tracking-wider text-white placeholder:text-slate-600 placeholder:font-normal placeholder:tracking-normal transition" />
+              <span id="create-char-count" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-500">0/10</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1.5">Only letters and numbers (A–Z, 0–9). Share this exact password with your opponent.</p>
+          </div>
+
+          <button id="btn-create-room" type="button"
+            class="w-full py-4 rounded-xl font-display text-2xl tracking-wider bg-gradient-to-r from-emerald-500 via-emerald-400 to-cyan-400 text-slate-950 hover:brightness-110 active:scale-[0.99] transition shadow-xl shadow-emerald-500/25 cursor-pointer">
+            OPEN STADIUM LOBBY
+          </button>
+
+          <!-- Waiting Status Box -->
+          <div id="create-waiting-box" class="hidden rounded-2xl bg-slate-900/90 border border-emerald-500/35 p-4 text-center space-y-3">
+            <div class="flex items-center justify-center gap-2.5 text-emerald-300 font-semibold text-sm">
+              <span class="w-3 h-3 rounded-full bg-emerald-400 pulse-ring"></span>
+              <span id="create-waiting-text">Waiting for opponent to join...</span>
+            </div>
+            <div class="flex items-center justify-center gap-2">
+              <span class="text-xs uppercase tracking-wider text-slate-400">Room Password:</span>
+              <code id="display-room-password" class="px-3 py-1 rounded-lg bg-slate-950 border border-white/15 font-mono text-base font-bold text-amber-300 tracking-widest"></code>
+              <button id="btn-copy-password" type="button"
+                class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition cursor-pointer">
+                Copy
+              </button>
+            </div>
+            <button id="btn-cancel-host" type="button"
+              class="text-xs font-semibold text-rose-400 hover:text-rose-300 underline underline-offset-4 cursor-pointer">
+              Cancel &amp; Change Password
+            </button>
+          </div>
+        </div>
+
+        <!-- JOIN MATCH PANEL -->
+        <div id="panel-join" class="hidden space-y-4">
+          <div>
+            <label for="join-password" class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">
+              Enter Host's Room Password
+            </label>
+            <input id="join-password" type="text" maxlength="10" autocomplete="off" spellcheck="false"
+              placeholder="Type exact password (e.g. CR7GOAT)"
+              class="w-full px-4 py-3.5 rounded-xl bg-slate-950/80 border border-slate-700/80 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/25 outline-none text-lg font-bold tracking-wider text-white placeholder:text-slate-600 placeholder:font-normal placeholder:tracking-normal transition" />
+            <p class="text-xs text-slate-400 mt-1.5">Case-sensitive alphanumeric code set by your opponent.</p>
+          </div>
+
+          <button id="btn-join-room" type="button"
+            class="w-full py-4 rounded-xl font-display text-2xl tracking-wider bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 text-slate-950 hover:brightness-110 active:scale-[0.99] transition shadow-xl shadow-cyan-500/25 cursor-pointer">
+            CONNECT &amp; ENTER LOCKER ROOM
+          </button>
+
+          <div id="join-waiting-box" class="hidden rounded-2xl bg-slate-900/90 border border-cyan-500/35 p-4 text-center space-y-2">
+            <div class="flex items-center justify-center gap-2.5 text-cyan-300 font-semibold text-sm">
+              <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+              <span id="join-waiting-text">Connecting to stadium host...</span>
+            </div>
+            <button id="btn-cancel-join" type="button"
+              class="text-xs font-semibold text-rose-400 hover:text-rose-300 underline underline-offset-4 cursor-pointer">
+              Cancel Connection
+            </button>
+          </div>
+        </div>
+
+        <!-- Error Alert -->
+        <div id="lobby-error" class="hidden mt-4 rounded-xl bg-rose-500/15 border border-rose-500/40 px-4 py-3 text-sm text-rose-200 font-medium"></div>
+      </div>
+
+      <!-- Quick Rules Footer -->
+      <div class="mt-5 grid grid-cols-3 gap-2 text-center text-[11px] sm:text-xs text-slate-400">
+        <div class="px-2 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <span class="block text-emerald-400 font-bold">5 ROUNDS + SD</span>
+          Official FIFA Rules
+        </div>
+        <div class="px-2 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <span class="block text-cyan-400 font-bold">MIND GAMES</span>
+          Live Keeper Emotes
+        </div>
+        <div class="px-2 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <span class="block text-amber-400 font-bold">CELEBRATIONS</span>
+          5 Iconic Animations
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- =========================================================
+       SCREEN 2: LOCKER ROOM (CUSTOM JERSEY & KIT SELECTION)
+       ========================================================= -->
+  <section id="screen-locker" class="hidden min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6">
+    <div class="w-full max-w-4xl">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-5">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-widest text-emerald-400">Match Connected • Pre-Kickoff</span>
+          <h2 class="font-display text-4xl sm:text-5xl text-white tracking-wider leading-none mt-0.5">LOCKER ROOM</h2>
+        </div>
+        <div id="locker-opponent-status" class="inline-flex items-center gap-2 px-4 py-2 rounded-2xl glass-panel text-xs sm:text-sm font-semibold text-slate-300">
+          <span id="locker-opp-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+          <span id="locker-opp-text">Opponent is picking their kit...</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
+        <!-- Live Jersey Back Preview -->
+        <div class="md:col-span-5 glass-panel rounded-3xl p-6 flex flex-col items-center justify-center relative overflow-hidden">
+          <div class="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-white/[0.05] to-transparent pointer-events-none"></div>
+          <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3">Live Jersey Back Preview</span>
+
+          <!-- SVG Jersey Back -->
+          <div class="w-56 h-64 sm:w-64 sm:h-72 flex items-center justify-center drop-shadow-[0_18px_28px_rgba(0,0,0,0.65)]">
+            <svg id="jersey-preview-svg" viewBox="0 0 260 280" class="w-full h-full">
+              <defs>
+                <clipPath id="torsoClip">
+                  <path d="M72,32 L188,32 L245,84 L218,124 L196,108 L196,258 L64,258 L64,108 L42,124 L15,84 Z" />
+                </clipPath>
+                <linearGradient id="fabricShade" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="rgba(0,0,0,0.22)" />
+                  <stop offset="22%" stop-color="rgba(255,255,255,0.06)" />
+                  <stop offset="50%" stop-color="rgba(255,255,255,0.12)" />
+                  <stop offset="78%" stop-color="rgba(255,255,255,0.03)" />
+                  <stop offset="100%" stop-color="rgba(0,0,0,0.25)" />
+                </linearGradient>
+              </defs>
+
+              <!-- Jersey Base Shape -->
+              <g clip-path="url(#torsoClip)">
+                <rect id="svg-kit-base" x="0" y="0" width="260" height="280" fill="#F8FAFC" />
+                <!-- Stripes layer (shown for striped kits) -->
+                <g id="svg-kit-stripes" opacity="0">
+                  <rect x="64" y="0" width="22" height="280" fill="#B91C1C" />
+                  <rect x="108" y="0" width="22" height="280" fill="#B91C1C" />
+                  <rect x="152" y="0" width="22" height="280" fill="#B91C1C" />
+                </g>
+                <!-- Shoulder Accent Panels -->
+                <path id="svg-kit-shoulder-l" d="M15,84 L72,32 L88,42 L34,96 Z" fill="#D4AF37" opacity="0.9" />
+                <path id="svg-kit-shoulder-r" d="M245,84 L188,32 L172,42 L226,96 Z" fill="#D4AF37" opacity="0.9" />
+                <!-- Sleeve Cuffs -->
+                <path id="svg-kit-cuff-l" d="M15,84 L42,124 L50,118 L23,78 Z" fill="#D4AF37" />
+                <path id="svg-kit-cuff-r" d="M245,84 L218,124 L210,118 L237,78 Z" fill="#D4AF37" />
+                <!-- Subtle Fabric Shading -->
+                <rect x="0" y="0" width="260" height="280" fill="url(#fabricShade)" />
+              </g>
+
+              <!-- Collar Back -->
+              <path d="M95,30 Q130,52 165,30 L176,36 Q130,66 84,36 Z" id="svg-kit-collar" fill="#D4AF37" />
+              <!-- Outer Stitch Outline -->
+              <path d="M72,32 L188,32 L245,84 L218,124 L196,108 L196,258 L64,258 L64,108 L42,124 L15,84 Z"
+                fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="2" />
+
+              <!-- Curved/Bold Player Name -->
+              <text id="svg-jersey-name" x="130" y="92" text-anchor="middle"
+                font-family="'Bebas Neue', Impact, sans-serif" font-size="29" font-weight="900" letter-spacing="2.5"
+                fill="#0F172A" stroke="rgba(255,255,255,0.25)" stroke-width="0.6">RONALDO</text>
+
+              <!-- Large Number -->
+              <text id="svg-jersey-number" x="130" y="205" text-anchor="middle"
+                font-family="'Bebas Neue', Impact, sans-serif" font-size="118" font-weight="900"
+                fill="#0F172A" stroke="rgba(0,0,0,0.18)" stroke-width="2">7</text>
+            </svg>
+          </div>
+
+          <div class="mt-2 flex items-center gap-2 text-xs text-slate-400">
+            <span id="locker-role-badge" class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">HOST • SHOOTS 1ST</span>
+          </div>
+        </div>
+
+        <!-- Customization Controls -->
+        <div class="md:col-span-7 glass-panel rounded-3xl p-6 flex flex-col justify-between space-y-5">
+          <div class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="sm:col-span-2">
+                <label for="input-jersey-name" class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                  Jersey Name <span class="text-slate-500 font-normal">(Max 12)</span>
+                </label>
+                <input id="input-jersey-name" type="text" maxlength="12" autocomplete="off"
+                  class="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700 focus:border-emerald-400 outline-none font-bold uppercase tracking-wider text-white text-base" />
+              </div>
+              <div>
+                <label for="input-jersey-number" class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                  Number <span class="text-slate-500 font-normal">(1–99)</span>
+                </label>
+                <input id="input-jersey-number" type="number" min="1" max="99" value="7"
+                  class="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700 focus:border-emerald-400 outline-none font-bold text-center text-white text-base" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">
+                Select Kit Style
+              </label>
+              <div id="kit-preset-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5"></div>
+            </div>
+          </div>
+
+          <!-- Ready Button & Opponent Preview -->
+          <div class="pt-3 border-t border-white/10 space-y-3">
+            <div id="locker-opp-kit-preview" class="hidden items-center justify-between px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs">
+              <span class="text-emerald-300 font-semibold">Opponent Locked In:</span>
+              <span id="locker-opp-kit-label" class="font-bold text-white tracking-wide"></span>
+            </div>
+
+            <button id="btn-ready-kickoff" type="button"
+              class="w-full py-4 rounded-xl font-display text-2xl tracking-wider bg-gradient-to-r from-emerald-500 to-cyan-400 text-slate-950 hover:brightness-110 active:scale-[0.99] transition shadow-xl shadow-emerald-500/20 cursor-pointer">
+              READY FOR KICKOFF
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       SCREEN 3: MATCH STADIUM ARENA
+       ========================================================= -->
+  <section id="screen-game" class="hidden relative w-full h-screen overflow-hidden flex flex-col justify-between bg-slate-950">
+    <!-- Fullscreen 3rd-Person Canvas -->
+    <canvas id="stadium-canvas" class="absolute inset-0 w-full h-full block"></canvas>
+
+    <!-- TV BROADCAST SCOREBUG (TOP-LEFT) -->
+    <header class="relative z-20 p-3 sm:p-4 pointer-events-none flex flex-wrap items-start justify-between gap-3">
+      <div class="scorebug-glass rounded-2xl p-2.5 sm:px-4 sm:py-3 pointer-events-auto max-w-full">
+        <!-- Top Turn Strip -->
+        <div class="flex items-center justify-between gap-4 pb-2 mb-2 border-b border-white/10 text-[11px] font-bold uppercase tracking-wider">
+          <div class="flex items-center gap-2">
+            <span id="hud-round-label" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">ROUND 1 / 5</span>
+            <span id="hud-sd-badge" class="hidden px-2 py-0.5 rounded bg-rose-600 text-white animate-pulse">SUDDEN DEATH</span>
+          </div>
+          <span id="hud-role-label" class="text-amber-300">YOUR TURN: STRIKER</span>
+        </div>
+
+        <!-- Teams Rows -->
+        <div class="space-y-1.5">
+          <!-- Host Row -->
+          <div class="flex items-center gap-2.5 sm:gap-3">
+            <span id="sb-host-swatch" class="w-3 h-5 rounded-sm border border-white/30 shrink-0"></span>
+            <span id="sb-host-name" class="font-display text-lg sm:text-xl tracking-wide text-white w-24 sm:w-28 truncate leading-none">HOST</span>
+            <span id="sb-host-score" class="font-display text-2xl text-emerald-400 w-6 text-center leading-none">0</span>
+            <div id="sb-host-dots" class="flex items-center gap-1 sm:gap-1.5 flex-wrap"></div>
+          </div>
+          <!-- Guest Row -->
+          <div class="flex items-center gap-2.5 sm:gap-3">
+            <span id="sb-guest-swatch" class="w-3 h-5 rounded-sm border border-white/30 shrink-0"></span>
+            <span id="sb-guest-name" class="font-display text-lg sm:text-xl tracking-wide text-white w-24 sm:w-28 truncate leading-none">GUEST</span>
+            <span id="sb-guest-score" class="font-display text-2xl text-cyan-400 w-6 text-center leading-none">0</span>
+            <div id="sb-guest-dots" class="flex items-center gap-1 sm:gap-1.5 flex-wrap"></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- CENTER OVERLAY BANNER (GOAL! / SAVED! / SUDDEN DEATH!) -->
+    <div id="center-banner-wrap" class="pointer-events-none fixed inset-0 z-30 flex items-center justify-center p-4">
+      <div id="center-banner" class="hidden text-center">
+        <div id="center-banner-main" class="font-display text-7xl sm:text-9xl tracking-wider text-white drop-shadow-[0_10px_35px_rgba(0,0,0,0.85)] leading-none">
+          GOAL!
+        </div>
+        <div id="center-banner-sub" class="mt-1 inline-block px-4 py-1 rounded-full bg-slate-950/85 border border-white/20 text-xs sm:text-sm font-bold uppercase tracking-widest text-amber-300">
+          UNSTOPPABLE FINISH
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM TACTICAL HUD -->
+    <footer class="relative z-20 p-3 sm:p-5 flex flex-col items-center gap-2.5 pointer-events-none">
+      <!-- Status / Opponent Lock-in Pill -->
+      <div id="tactical-status-pill" class="pointer-events-auto px-4 py-1.5 rounded-full scorebug-glass text-xs sm:text-sm font-semibold text-slate-200 flex items-center gap-2">
+        <span id="tactical-status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="tactical-status-text">Choose your corner!</span>
+      </div>
+
+      <!-- Keeper Psychological Emotes Bar (Only shown when local player is Goalkeeper during choosing phase) -->
+      <div id="keeper-emote-bar" class="hidden pointer-events-auto flex items-center gap-2 flex-wrap justify-center">
+        <span class="text-[10px] font-bold uppercase tracking-widest text-cyan-300/90 mr-1">Mind Games:</span>
+        <button type="button" data-emote="wave"
+          class="emote-btn px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-cyan-500/20 border border-cyan-400/35 text-xs font-bold text-cyan-200 transition cursor-pointer active:scale-95">
+          🙌 Wave Arms
+        </button>
+        <button type="button" data-emote="point"
+          class="emote-btn px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-amber-500/20 border border-amber-400/35 text-xs font-bold text-amber-200 transition cursor-pointer active:scale-95">
+          👉 Point Bluff
+        </button>
+        <button type="button" data-emote="trash"
+          class="emote-btn px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-rose-500/20 border border-rose-400/35 text-xs font-bold text-rose-200 transition cursor-pointer active:scale-95">
+          🗣️ Trash Talk
+        </button>
+      </div>
+
+      <!-- 3-Way Tactical Controls -->
+      <div id="tactical-controls" class="pointer-events-auto w-full max-w-xl grid grid-cols-3 gap-2.5 sm:gap-3">
+        <button id="btn-dir-left" type="button" data-dir="left"
+          class="tactical-btn glass-panel rounded-2xl py-3.5 sm:py-4 px-2 flex flex-col items-center justify-center gap-1 border-2 border-white/15 hover:border-emerald-400/80 cursor-pointer">
+          <span class="text-xl sm:text-2xl">↖️</span>
+          <span id="lbl-dir-left" class="font-display text-xl sm:text-2xl tracking-wide text-white leading-none">LEFT</span>
+          <span class="text-[10px] text-slate-400 font-semibold hidden sm:inline">Key: A / ←</span>
+        </button>
+
+        <button id="btn-dir-center" type="button" data-dir="center"
+          class="tactical-btn glass-panel rounded-2xl py-3.5 sm:py-4 px-2 flex flex-col items-center justify-center gap-1 border-2 border-white/15 hover:border-amber-400/80 cursor-pointer">
+          <span class="text-xl sm:text-2xl">⬆️</span>
+          <span id="lbl-dir-center" class="font-display text-xl sm:text-2xl tracking-wide text-white leading-none">PANENKA</span>
+          <span class="text-[10px] text-slate-400 font-semibold hidden sm:inline">Key: W / ↑</span>
+        </button>
+
+        <button id="btn-dir-right" type="button" data-dir="right"
+          class="tactical-btn glass-panel rounded-2xl py-3.5 sm:py-4 px-2 flex flex-col items-center justify-center gap-1 border-2 border-white/15 hover:border-cyan-400/80 cursor-pointer">
+          <span class="text-xl sm:text-2xl">↗️</span>
+          <span id="lbl-dir-right" class="font-display text-xl sm:text-2xl tracking-wide text-white leading-none">RIGHT</span>
+          <span class="text-[10px] text-slate-400 font-semibold hidden sm:inline">Key: D / →</span>
+        </button>
+      </div>
+    </footer>
+  </section>
+
+  <!-- =========================================================
+       SCREEN 4: VICTORY SPOTLIGHT & INTERACTIVE CELEBRATIONS
+       ========================================================= -->
+  <section id="screen-victory" class="hidden relative w-full h-screen overflow-hidden flex flex-col justify-between bg-slate-950">
+    <canvas id="victory-canvas" class="absolute inset-0 w-full h-full block"></canvas>
+
+    <!-- Top Victory Header -->
+    <div class="relative z-20 p-4 sm:p-6 flex flex-col items-center text-center pointer-events-none">
+      <div class="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-amber-400/20 border border-amber-400/50 text-amber-300 text-xs font-bold uppercase tracking-widest mb-2">
+        🏆 Shootout Champions
+      </div>
+      <h2 id="victory-headline" class="font-display text-5xl sm:text-7xl text-white tracking-wider drop-shadow-[0_6px_28px_rgba(250,204,21,0.45)] leading-none">
+        RONALDO WINS!
+      </h2>
+      <p id="victory-scoreline" class="text-sm sm:text-base font-bold text-slate-200 mt-1 px-4 py-1 rounded-full scorebug-glass">
+        FINAL SCORE: 4 – 2
+      </p>
+    </div>
+
+    <!-- Active Celebration Kinetic Banner -->
+    <div id="celeb-banner-wrap" class="pointer-events-none relative z-20 flex items-center justify-center px-4">
+      <div id="celeb-banner" class="hidden font-display text-6xl sm:text-8xl tracking-widest text-amber-300 drop-shadow-[0_8px_30px_rgba(0,0,0,0.9)] text-center">
+        SIUUU!
+      </div>
+    </div>
+
+    <!-- Bottom Celebration Menu (Winner) / Spectate Pill (Loser) + Match Summary -->
+    <div class="relative z-20 p-3 sm:p-5 flex flex-col items-center gap-3">
+      <!-- Winner Celebration Selector -->
+      <div id="winner-celeb-dock" class="hidden w-full max-w-3xl glass-panel rounded-3xl p-3 sm:p-4">
+        <div class="flex items-center justify-between mb-2 px-1">
+          <span class="text-xs font-bold uppercase tracking-widest text-amber-300">🎉 Pick Your Victory Celebration (Live Synced!)</span>
+          <span class="text-[11px] text-slate-400 hidden sm:inline">Tap any celebration to perform</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <button type="button" data-celeb="siuuu"
+            class="celeb-btn px-3 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/30 border border-amber-400/40 text-xs font-bold text-amber-200 transition cursor-pointer active:scale-95">
+            ⚡ SIUUU!
+          </button>
+          <button type="button" data-celeb="mbappe"
+            class="celeb-btn px-3 py-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-400/40 text-xs font-bold text-cyan-200 transition cursor-pointer active:scale-95">
+            🙅 Mbappé Style
+          </button>
+          <button type="button" data-celeb="slide"
+            class="celeb-btn px-3 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-400/40 text-xs font-bold text-emerald-200 transition cursor-pointer active:scale-95">
+            🔥 Knee Slide
+          </button>
+          <button type="button" data-celeb="calma"
+            class="celeb-btn px-3 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/30 border border-purple-400/40 text-xs font-bold text-purple-200 transition cursor-pointer active:scale-95">
+            🖐️ Calma Calma
+          </button>
+          <button type="button" data-celeb="cold"
+            class="celeb-btn col-span-2 sm:col-span-1 px-3 py-2.5 rounded-xl bg-sky-400/15 hover:bg-sky-400/30 border border-sky-300/50 text-xs font-bold text-sky-200 transition cursor-pointer active:scale-95">
+            🥶 Palmer Cold
+          </button>
+        </div>
+      </div>
+
+      <!-- Loser Spectate Status -->
+      <div id="loser-spectate-pill" class="hidden px-5 py-2.5 rounded-full glass-panel text-xs sm:text-sm font-semibold text-slate-200">
+        👀 Watching <span id="loser-winner-name" class="text-amber-300 font-bold">Winner</span> celebrate...
+      </div>
+
+      <!-- Final Match Summary + Rematch Bar -->
+      <div class="w-full max-w-3xl glass-panel rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div id="victory-summary-dots" class="flex flex-col gap-1 text-xs w-full sm:w-auto"></div>
+        <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          <button id="btn-rematch" type="button"
+            class="flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-display text-xl tracking-wider bg-gradient-to-r from-emerald-500 to-cyan-400 text-slate-950 hover:brightness-110 transition shadow-lg shadow-emerald-500/20 cursor-pointer">
+            REMATCH (KEEP KITS)
+          </button>
+          <button id="btn-exit-lobby" type="button"
+            class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-slate-200 transition cursor-pointer">
+            Main Menu
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DISCONNECT MODAL -->
+  <div id="disconnect-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel rounded-3xl p-6 max-w-sm w-full text-center space-y-4">
+      <div class="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center text-2xl mx-auto">⚠️</div>
+      <h3 class="font-display text-3xl text-white tracking-wide">CONNECTION LOST</h3>
+      <p id="disconnect-reason" class="text-sm text-slate-300">Your opponent disconnected from the stadium.</p>
+      <button id="btn-modal-home" type="button"
+        class="w-full py-3 rounded-xl font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition cursor-pointer">
+        Return to Main Menu
+      </button>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      /* =====================================================================
+         1. KIT PRESETS & CONSTANTS
+         ===================================================================== */
+      const PEER_NAMESPACE = 'pk-arena-v1-';
+
+      const KIT_PRESETS = [
+        {
+          id: 'madrid',
+          name: 'Madrid White',
+          primary: '#F8FAFC',
+          secondary: '#D4AF37',
+          stripes: false,
+          stripeColor: '#E2E8F0',
+          textColor: '#0F172A',
+          textStroke: 'rgba(212, 175, 55, 0.5)',
+          shorts: '#F1F5F9',
+          socks: '#F8FAFC'
+        },
+        {
+          id: 'crimson',
+          name: 'Classic Red',
+          primary: '#DC2626',
+          secondary: '#FFFFFF',
+          stripes: false,
+          stripeColor: '#991B1B',
+          textColor: '#FFFFFF',
+          textStroke: 'rgba(0, 0, 0, 0.45)',
+          shorts: '#FFFFFF',
+          socks: '#DC2626'
+        },
+        {
+          id: 'barca',
+          name: 'Barca Stripes',
+          primary: '#1D4ED8',
+          secondary: '#FACC15',
+          stripes: true,
+          stripeColor: '#B91C1C',
+          textColor: '#FACC15',
+          textStroke: 'rgba(15, 23, 42, 0.8)',
+          shorts: '#1E3A8A',
+          socks: '#1D4ED8'
+        },
+        {
+          id: 'brazil',
+          name: 'Brazil Yellow',
+          primary: '#FACC15',
+          secondary: '#16A34A',
+          stripes: false,
+          stripeColor: '#EAB308',
+          textColor: '#14532D',
+          textStroke: 'rgba(255, 255, 255, 0.4)',
+          shorts: '#1D4ED8',
+          socks: '#FFFFFF'
+        },
+        {
+          id: 'neon',
+          name: 'Neon Black',
+          primary: '#0F172A',
+          secondary: '#22D3EE',
+          stripes: false,
+          stripeColor: '#1E293B',
+          textColor: '#22D3EE',
+          textStroke: 'rgba(0, 0, 0, 0.85)',
+          shorts: '#020617',
+          socks: '#0F172A'
+        },
+        {
+          id: 'sky',
+          name: 'Sky Blue',
+          primary: '#38BDF8',
+          secondary: '#0C4A6E',
+          stripes: false,
+          stripeColor: '#0284C7',
+          textColor: '#FFFFFF',
+          textStroke: 'rgba(12, 74, 110, 0.7)',
+          shorts: '#FFFFFF',
+          socks: '#38BDF8'
+        }
+      ];
+
+      function getKit(kitId) {
+        return KIT_PRESETS.find(k => k.id === kitId) || KIT_PRESETS[0];
+      }
+
+      /* =====================================================================
+         2. PROCEDURAL WEB AUDIO ENGINE (ZERO EXTERNAL FILES)
+         ===================================================================== */
+      class SoundEngine {
+        constructor() {
+          this.ctx = null;
+          this.muted = false;
+          this.noiseBuffer = null;
+        }
+
+        unlock() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              this.ctx = new AudioCtx();
+              this._buildNoiseBuffer();
+            }
+          }
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+          }
+        }
+
+        _buildNoiseBuffer() {
+          if (!this.ctx) return;
+          const length = this.ctx.sampleRate * 3;
+          const buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          let b0 = 0, b1 = 0, b2 = 0;
+          for (let i = 0; i < length; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99765 * b0 + white * 0.099046;
+            b1 = 0.96300 * b1 + white * 0.2965164;
+            b2 = 0.57000 * b2 + white * 1.0526913;
+            data[i] = (b0 + b1 + b2 + white * 0.1848) * 0.14;
+          }
+          this.noiseBuffer = buffer;
+        }
+
+        setMuted(val) {
+          this.muted = val;
+        }
+
+        playClick() {
+          if (this.muted) return;
+          this.unlock();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(620, t);
+          osc.frequency.exponentialRampToValueAtTime(320, t + 0.045);
+          gain.gain.setValueAtTime(0.08, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+          osc.connect(gain).connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.05);
+        }
+
+        playWhistle(duration = 0.36) {
+          if (this.muted) return;
+          this.unlock();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+
+          const osc1 = this.ctx.createOscillator();
+          const osc2 = this.ctx.createOscillator();
+          const lfo = this.ctx.createOscillator();
+          const lfoGain = this.ctx.createGain();
+          const master = this.ctx.createGain();
+
+          osc1.type = 'sine';
+          osc2.type = 'triangle';
+          osc1.frequency.setValueAtTime(2860, t);
+          osc2.frequency.setValueAtTime(3140, t);
+
+          // Pea-whistle trill
+          lfo.frequency.setValueAtTime(42, t);
+          lfoGain.gain.setValueAtTime(110, t);
+          lfo.connect(lfoGain);
+          lfoGain.connect(osc1.frequency);
+          lfoGain.connect(osc2.frequency);
+
+          master.gain.setValueAtTime(0.001, t);
+          master.gain.linearRampToValueAtTime(0.16, t + 0.025);
+          master.gain.setValueAtTime(0.14, t + duration - 0.06);
+          master.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+          osc1.connect(master);
+          osc2.connect(master);
+          master.connect(this.ctx.destination);
+
+          osc1.start(t);
+          osc2.start(t);
+          lfo.start(t);
+          osc1.stop(t + duration + 0.02);
+          osc2.stop(t + duration + 0.02);
+          lfo.stop(t + duration + 0.02);
+        }
+
+        playFullTimeWhistle() {
+          this.playWhistle(0.22);
+          setTimeout(() => this.playWhistle(0.22), 290);
+          setTimeout(() => this.playWhistle(0.58), 580);
+        }
+
+        playKick() {
+          if (this.muted) return;
+          this.unlock();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+
+          // Deep leather thud
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(165, t);
+          osc.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+          gain.gain.setValueAtTime(0.42, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+          osc.connect(gain).connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.18);
+
+          // Crisp boot snap
+          if (this.noiseBuffer) {
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = this.noiseBuffer;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(1100, t);
+            filter.Q.setValueAtTime(1.5, t);
+            const nGain = this.ctx.createGain();
+            nGain.gain.setValueAtTime(0.28, t);
+            nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+            noise.connect(filter).connect(nGain).connect(this.ctx.destination);
+            noise.start(t);
+            noise.stop(t + 0.08);
+          }
+        }
+
+        playSave() {
+          if (this.muted) return;
+          this.unlock();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+
+          // Glove slap
+          if (this.noiseBuffer) {
+            const slap = this.ctx.createBufferSource();
+            slap.buffer = this.noiseBuffer;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(1850, t);
+            filter.Q.setValueAtTime(1.2, t);
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.35, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+            slap.connect(filter).connect(gain).connect(this.ctx.destination);
+            slap.start(t);
+            slap.stop(t + 0.14);
+
+            // Collective crowd "OOOOOH!" groan
+            const crowd = this.ctx.createBufferSource();
+            crowd.buffer = this.noiseBuffer;
+            const cFilter = this.ctx.createBiquadFilter();
+            cFilter.type = 'bandpass';
+            cFilter.frequency.setValueAtTime(480, t + 0.05);
+            cFilter.frequency.linearRampToValueAtTime(280, t + 1.1);
+            cFilter.Q.setValueAtTime(2.2, t);
+            const cGain = this.ctx.createGain();
+            cGain.gain.setValueAtTime(0.001, t);
+            cGain.gain.linearRampToValueAtTime(0.22, t + 0.18);
+            cGain.gain.exponentialRampToValueAtTime(0.001, t + 1.35);
+            crowd.connect(cFilter).connect(cGain).connect(this.ctx.destination);
+            crowd.start(t);
+            crowd.stop(t + 1.4);
+          }
+        }
+
+        playGoalRoar() {
+          if (this.muted) return;
+          this.unlock();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+
+          if (this.noiseBuffer) {
+            const crowd = this.ctx.createBufferSource();
+            crowd.buffer = this.noiseBuffer;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(620, t);
+            filter.frequency.linearRampToValueAtTime(1150, t + 0.45);
+            filter.frequency.linearRampToValueAtTime(750, t + 2.1);
+            filter.Q.setValueAtTime(0.75, t);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.001, t);
+            gain.gain.linearRampToValueAtTime(0.42, t + 0.22);
+            gain.gain.setValueAtTime(0.36, t + 1.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 2.4);
+
+            crowd.connect(filter).connect(gain).connect(this.ctx.destination);
+            crowd.start(t);
+            crowd.stop(t + 2.45);
+          }
+
+          // Subtle stadium horn/chord shimmer
+          [261.63, 329.63, 392.0].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t + idx * 0.03);
+            g.gain.setValueAtTime(0.001, t);
+            g.gain.linearRampToValueAtTime(0.045, t + 0.15);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+            osc.connect(g).connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.95);
+          });
+        }
+
+        playEmote() {
+          if (this.muted) return;
+          this.unlock();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, t);
+          osc.frequency.exponentialRampToValueAtTime(680, t + 0.08);
+          gain.gain.setValueAtTime(0.08, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+          osc.connect(gain).connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.12);
+        }
+
+        playIceChime() {
+          if (this.muted) return;
+          this.unlock();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          [1046.5, 1318.5, 1567.98, 2093].forEach((f, i) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, t + i * 0.07);
+            g.gain.setValueAtTime(0.08, t + i * 0.07);
+            g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + 0.45);
+            osc.connect(g).connect(this.ctx.destination);
+            osc.start(t + i * 0.07);
+            osc.stop(t + i * 0.07 + 0.48);
+          });
+        }
+
+        playVictoryFanfare() {
+          if (this.muted) return;
+          this.unlock();
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const notes = [392.0, 523.25, 659.25, 783.99];
+          notes.forEach((f, i) => {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'triangle';
+            const start = t + i * 0.11;
+            const dur = i === notes.length - 1 ? 0.75 : 0.22;
+            osc.frequency.setValueAtTime(f, start);
+            g.gain.setValueAtTime(0.001, start);
+            g.gain.linearRampToValueAtTime(0.11, start + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+            osc.connect(g).connect(this.ctx.destination);
+            osc.start(start);
+            osc.stop(start + dur + 0.05);
+          });
+        }
+      }
+
+      const sound = new SoundEngine();
+
+      /* =====================================================================
+         3. APPLICATION STATE & MULTIPLAYER STATE MACHINE
+         ===================================================================== */
+      const appState = {
+        screen: 'lobby', // lobby | locker | game | victory
+        isHost: false,
+        roomPassword: '',
+        peer: null,
+        conn: null,
+        connected: false,
+
+        // Player kits
+        localKit: { name: 'RONALDO', number: 7, kitId: 'madrid' },
+        hostKit: { name: 'RONALDO', number: 7, kitId: 'madrid' },
+        guestKit: { name: 'MESSI', number: 10, kitId: 'barca' },
+        localLockerReady: false,
+        remoteLockerReady: false,
+
+        // Match State (Host authoritative, mirrored to Guest)
+        match: createFreshMatchState(),
+
+        // Turn Input State
+        localChoice: null,       // 'left' | 'center' | 'right' | null
+        opponentLocked: false,
+        hostChoiceBuffer: null,  // Host only
+        guestChoiceBuffer: null, // Host only
+        isAnimatingKick: false,
+        lastEmoteTime: 0,
+
+        // Victory & Rematch
+        winnerRole: null, // 'host' | 'guest'
+        localRematchReady: false,
+        remoteRematchReady: false
+      };
+
+      function createFreshMatchState() {
+        return {
+          kickIndex: 0, // 0..9 regular, 10+ sudden death
+          hostHistory: [], // array of booleans (true=goal, false=saved)
+          guestHistory: [],
+          hostScore: 0,
+          guestScore: 0,
+          isSuddenDeath: false,
+          finished: false,
+          winner: null // 'host' | 'guest'
+        };
+      }
+
+      function currentStrikerRole(kickIndex = appState.match.kickIndex) {
+        // Host shoots first in Round 1 (kickIndex 0, 2, 4...)
+        return kickIndex % 2 === 0 ? 'host' : 'guest';
+      }
+
+      function isLocalStriker() {
+        const s = currentStrikerRole();
+        return (appState.isHost && s === 'host') || (!appState.isHost && s === 'guest');
+      }
+
+      /* =====================================================================
+         4. DOM REFERENCES
+         ===================================================================== */
+      const $ = id => document.getElementById(id);
+
+      const screens = {
+        lobby: $('screen-lobby'),
+        locker: $('screen-locker'),
+        game: $('screen-game'),
+        victory: $('screen-victory')
+      };
+
+      function showScreen(name) {
+        appState.screen = name;
+        Object.entries(screens).forEach(([k, el]) => {
+          if (k === name) el.classList.remove('hidden');
+          else el.classList.add('hidden');
+        });
+        if (name === 'game') {
+          resizeCanvas(stadiumCanvas);
+        } else if (name === 'victory') {
+          resizeCanvas(victoryCanvas);
+        }
+      }
+
+      /* =====================================================================
+         5. LOBBY & PEERJS WEBRTC CONNECTION
+         ===================================================================== */
+      const tabCreate = $('tab-create');
+      const tabJoin = $('tab-join');
+      const panelCreate = $('panel-create');
+      const panelJoin = $('panel-join');
+      const createPassInput = $('create-password');
+      const joinPassInput = $('join-password');
+      const lobbyError = $('lobby-error');
+      let joinTimeoutHandle = null;
+
+      function showLobbyError(msg) {
+        lobbyError.textContent = msg;
+        lobbyError.classList.remove('hidden');
+      }
+
+      function clearLobbyError() {
+        lobbyError.textContent = '';
+        lobbyError.classList.add('hidden');
+      }
+
+      function sanitizePassword(raw) {
+        return raw.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
+      }
+
+      createPassInput.addEventListener('input', () => {
+        const clean = sanitizePassword(createPassInput.value);
+        if (createPassInput.value !== clean) createPassInput.value = clean;
+        $('create-char-count').textContent = `${clean.length}/10`;
+        clearLobbyError();
+      });
+
+      joinPassInput.addEventListener('input', () => {
+        const clean = sanitizePassword(joinPassInput.value);
+        if (joinPassInput.value !== clean) joinPassInput.value = clean;
+        clearLobbyError();
+      });
+
+      tabCreate.addEventListener('click', () => {
+        sound.playClick();
+        clearLobbyError();
+        tabCreate.className = 'py-3 px-4 rounded-xl font-bold text-sm sm:text-base transition cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/20';
+        tabJoin.className = 'py-3 px-4 rounded-xl font-bold text-sm sm:text-base transition cursor-pointer text-slate-300 hover:text-white hover:bg-white/5';
+        panelCreate.classList.remove('hidden');
+        panelJoin.classList.add('hidden');
+      });
+
+      tabJoin.addEventListener('click', () => {
+        sound.playClick();
+        clearLobbyError();
+        tabJoin.className = 'py-3 px-4 rounded-xl font-bold text-sm sm:text-base transition cursor-pointer bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-lg shadow-cyan-500/20';
+        tabCreate.className = 'py-3 px-4 rounded-xl font-bold text-sm sm:text-base transition cursor-pointer text-slate-300 hover:text-white hover:bg-white/5';
+        panelJoin.classList.remove('hidden');
+        panelCreate.classList.add('hidden');
+      });
+
+      function cleanupPeer() {
+        if (joinTimeoutHandle) {
+          clearTimeout(joinTimeoutHandle);
+          joinTimeoutHandle = null;
+        }
+        if (appState.conn) {
+          try { appState.conn.close(); } catch (_) {}
+          appState.conn = null;
+        }
+        if (appState.peer) {
+          try { appState.peer.destroy(); } catch (_) {}
+          appState.peer = null;
+        }
+        appState.connected = false;
+        $('global-conn-pill').classList.add('hidden');
+        $('global-conn-pill').classList.remove('flex');
+      }
+
+      function createPeerConfig() {
+        return {
+          debug: 1,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' },
+              { urls: 'stun:stun2.l.google.com:19302' }
+            ]
+          }
+        };
+      }
+
+      function sendNet(payload) {
+        if (appState.conn && appState.conn.open) {
+          appState.conn.send(payload);
+        }
+      }
+
+      function attachConnectionHandlers(conn) {
+        appState.conn = conn;
+
+        conn.on('open', () => {
+          if (joinTimeoutHandle) {
+            clearTimeout(joinTimeoutHandle);
+            joinTimeoutHandle = null;
+          }
+          appState.connected = true;
+          $('global-conn-pill').classList.remove('hidden');
+          $('global-conn-pill').classList.add('flex');
+          $('global-conn-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+          $('global-conn-text').textContent = `Room: ${appState.roomPassword}`;
+          sendNet({ type: 'HELLO', role: appState.isHost ? 'host' : 'guest' });
+          enterLockerRoom();
+        });
+
+        conn.on('data', data => {
+          if (!data || typeof data !== 'object') return;
+          handleNetMessage(data);
+        });
+
+        conn.on('close', () => {
+          if (appState.connected) {
+            appState.connected = false;
+            $('disconnect-reason').textContent = 'Your opponent left or lost connection.';
+            $('disconnect-modal').classList.remove('hidden');
+          }
+        });
+
+        conn.on('error', err => {
+          console.error('Peer connection error:', err);
+        });
+      }
+
+      $('btn-create-room').addEventListener('click', () => {
+        sound.unlock();
+        sound.playClick();
+        clearLobbyError();
+
+        const password = sanitizePassword(createPassInput.value.trim());
+        if (password.length < 2) {
+          showLobbyError('Please enter an alphanumeric password (2–10 characters).');
+          return;
+        }
+        if (typeof Peer === 'undefined') {
+          showLobbyError('PeerJS library failed to load. Check your internet connection.');
+          return;
+        }
+
+        cleanupPeer();
+        appState.isHost = true;
+        appState.roomPassword = password;
+
+        $('btn-create-room').disabled = true;
+        $('create-waiting-box').classList.remove('hidden');
+        $('display-room-password').textContent = password;
+        $('create-waiting-text').textContent = 'Opening stadium room...';
+
+        const peerId = PEER_NAMESPACE + password;
+        const peer = new Peer(peerId, createPeerConfig());
+        appState.peer = peer;
+
+        peer.on('open', () => {
+          $('create-waiting-text').textContent = 'Waiting for opponent to join...';
+        });
+
+        peer.on('connection', conn => {
+          if (appState.conn && appState.conn.open) {
+            conn.close();
+            return;
+          }
+          $('create-waiting-text').textContent = 'Opponent found! Entering Locker Room...';
+          attachConnectionHandlers(conn);
+        });
+
+        peer.on('error', err => {
+          console.error('Host Peer error:', err);
+          $('btn-create-room').disabled = false;
+          $('create-waiting-box').classList.add('hidden');
+          if (err.type === 'unavailable-id') {
+            showLobbyError(`Password "${password}" is already in use right now. Pick another password!`);
+          } else {
+            showLobbyError(`Network error (${err.type || 'connection'}). Please try again.`);
+          }
+          cleanupPeer();
+        });
+      });
+
+      $('btn-cancel-host').addEventListener('click', () => {
+        sound.playClick();
+        cleanupPeer();
+        $('btn-create-room').disabled = false;
+        $('create-waiting-box').classList.add('hidden');
+      });
+
+      $('btn-copy-password').addEventListener('click', () => {
+        sound.playClick();
+        if (navigator.clipboard && appState.roomPassword) {
+          navigator.clipboard.writeText(appState.roomPassword).then(() => {
+            $('btn-copy-password').textContent = 'Copied!';
+            setTimeout(() => ($('btn-copy-password').textContent = 'Copy'), 1500);
+          }).catch(() => {});
+        }
+      });
+
+      $('btn-join-room').addEventListener('click', () => {
+        sound.unlock();
+        sound.playClick();
+        clearLobbyError();
+
+        const password = sanitizePassword(joinPassInput.value.trim());
+        if (password.length < 2) {
+          showLobbyError('Enter the exact 2–10 character room password from the Host.');
+          return;
+        }
+        if (typeof Peer === 'undefined') {
+          showLobbyError('PeerJS library failed to load. Check your internet connection.');
+          return;
+        }
+
+        cleanupPeer();
+        appState.isHost = false;
+        appState.roomPassword = password;
+
+        $('btn-join-room').disabled = true;
+        $('join-waiting-box').classList.remove('hidden');
+        $('join-waiting-text').textContent = `Connecting to match "${password}"...`;
+
+        const peer = new Peer(undefined, createPeerConfig());
+        appState.peer = peer;
+
+        joinTimeoutHandle = setTimeout(() => {
+          if (!appState.connected) {
+            $('btn-join-room').disabled = false;
+            $('join-waiting-box').classList.add('hidden');
+            showLobbyError(`Could not reach room "${password}". Verify the password and ensure the Host's lobby is open.`);
+            cleanupPeer();
+          }
+        }, 14000);
+
+        peer.on('open', () => {
+          const targetId = PEER_NAMESPACE + password;
+          const conn = peer.connect(targetId, { reliable: true });
+          attachConnectionHandlers(conn);
+        });
+
+        peer.on('error', err => {
+          console.error('Joiner Peer error:', err);
+          $('btn-join-room').disabled = false;
+          $('join-waiting-box').classList.add('hidden');
+          if (err.type === 'peer-unavailable') {
+            showLobbyError(`No active match found for password "${password}". Double-check capitalization!`);
+          } else {
+            showLobbyError(`Connection failed (${err.type || 'network'}). Try again.`);
+          }
+          cleanupPeer();
+        });
+      });
+
+      $('btn-cancel-join').addEventListener('click', () => {
+        sound.playClick();
+        cleanupPeer();
+        $('btn-join-room').disabled = false;
+        $('join-waiting-box').classList.add('hidden');
+      });
+
+      createPassInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !$('btn-create-room').disabled) {
+          $('btn-create-room').click();
+        }
+      });
+
+      joinPassInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !$('btn-join-room').disabled) {
+          $('btn-join-room').click();
+        }
+      });
+
+      /* =====================================================================
+         6. LOCKER ROOM & LIVE JERSEY CUSTOMIZATION
+         ===================================================================== */
+      const kitGrid = $('kit-preset-grid');
+      const jerseyNameInput = $('input-jersey-name');
+      const jerseyNumberInput = $('input-jersey-number');
+      const btnReadyKickoff = $('btn-ready-kickoff');
+
+      function buildKitButtons() {
+        kitGrid.innerHTML = '';
+        KIT_PRESETS.forEach(kit => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.dataset.kitId = kit.id;
+          btn.className = 'kit-preset-btn flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-950/70 border-2 border-white/10 hover:border-white/35 transition text-left cursor-pointer';
+          btn.innerHTML = `
+            <span class="w-7 h-7 rounded-lg shrink-0 border border-white/25 relative overflow-hidden" style="background:${kit.primary};">
+              ${kit.stripes ? `<span class="absolute inset-y-0 left-1.5 w-1.5" style="background:${kit.stripeColor}"></span><span class="absolute inset-y-0 right-1.5 w-1.5" style="background:${kit.stripeColor}"></span>` : ''}
+              <span class="absolute bottom-0 inset-x-0 h-1.5" style="background:${kit.secondary}"></span>
+            </span>
+            <span class="text-xs font-bold text-slate-200 leading-tight">${kit.name}</span>
+          `;
+          btn.addEventListener('click', () => {
+            if (appState.localLockerReady) return;
+            sound.playClick();
+            appState.localKit.kitId = kit.id;
+            updateJerseyPreview();
+          });
+          kitGrid.appendChild(btn);
+        });
+      }
+      buildKitButtons();
+
+      function updateJerseyPreview() {
+        const kit = getKit(appState.localKit.kitId);
+        const name = (appState.localKit.name || 'PLAYER').toUpperCase();
+        const num = appState.localKit.number;
+
+        $('svg-kit-base').setAttribute('fill', kit.primary);
+        $('svg-kit-stripes').setAttribute('opacity', kit.stripes ? '1' : '0');
+        $('svg-kit-shoulder-l').setAttribute('fill', kit.secondary);
+        $('svg-kit-shoulder-r').setAttribute('fill', kit.secondary);
+        $('svg-kit-cuff-l').setAttribute('fill', kit.secondary);
+        $('svg-kit-cuff-r').setAttribute('fill', kit.secondary);
+        $('svg-kit-collar').setAttribute('fill', kit.secondary);
+
+        const nameEl = $('svg-jersey-name');
+        nameEl.textContent = name;
+        nameEl.setAttribute('fill', kit.textColor);
+        nameEl.setAttribute('stroke', kit.textStroke);
+        nameEl.setAttribute('font-size', name.length > 9 ? '22' : '29');
+
+        const numEl = $('svg-jersey-number');
+        numEl.textContent = String(num);
+        numEl.setAttribute('fill', kit.textColor);
+        numEl.setAttribute('stroke', kit.textStroke);
+
+        document.querySelectorAll('.kit-preset-btn').forEach(btn => {
+          if (btn.dataset.kitId === kit.id) {
+            btn.classList.add('border-emerald-400', 'bg-emerald-500/15');
+            btn.classList.remove('border-white/10');
+          } else {
+            btn.classList.remove('border-emerald-400', 'bg-emerald-500/15');
+            btn.classList.add('border-white/10');
+          }
+        });
+      }
+
+      jerseyNameInput.addEventListener('input', () => {
+        const cleaned = jerseyNameInput.value.toUpperCase().replace(/[^A-Z0-9 \-]/g, '').slice(0, 12);
+        jerseyNameInput.value = cleaned;
+        appState.localKit.name = cleaned || 'PLAYER';
+        updateJerseyPreview();
+      });
+
+      jerseyNumberInput.addEventListener('input', () => {
+        let val = parseInt(jerseyNumberInput.value, 10);
+        if (isNaN(val)) val = 1;
+        val = Math.max(1, Math.min(99, val));
+        appState.localKit.number = val;
+        updateJerseyPreview();
+      });
+
+      jerseyNumberInput.addEventListener('blur', () => {
+        jerseyNumberInput.value = appState.localKit.number;
+      });
+
+      function enterLockerRoom() {
+        appState.localLockerReady = false;
+        appState.remoteLockerReady = false;
+
+        if (appState.isHost) {
+          appState.localKit = { name: 'RONALDO', number: 7, kitId: 'madrid' };
+          $('locker-role-badge').textContent = 'HOST • SHOOTS 1ST';
+        } else {
+          appState.localKit = { name: 'MESSI', number: 10, kitId: 'barca' };
+          $('locker-role-badge').textContent = 'CHALLENGER • KEEPS 1ST';
+        }
+
+        jerseyNameInput.value = appState.localKit.name;
+        jerseyNumberInput.value = appState.localKit.number;
+        jerseyNameInput.disabled = false;
+        jerseyNumberInput.disabled = false;
+        btnReadyKickoff.disabled = false;
+        btnReadyKickoff.textContent = 'READY FOR KICKOFF';
+        btnReadyKickoff.className = 'w-full py-4 rounded-xl font-display text-2xl tracking-wider bg-gradient-to-r from-emerald-500 to-cyan-400 text-slate-950 hover:brightness-110 active:scale-[0.99] transition shadow-xl shadow-emerald-500/20 cursor-pointer';
+
+        $('locker-opp-kit-preview').classList.add('hidden');
+        $('locker-opp-kit-preview').classList.remove('flex');
+        $('locker-opp-dot').className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+        $('locker-opp-text').textContent = 'Opponent is picking their kit...';
+
+        updateJerseyPreview();
+        showScreen('locker');
+      }
+
+      btnReadyKickoff.addEventListener('click', () => {
+        if (appState.localLockerReady) return;
+        sound.playClick();
+
+        const finalName = (jerseyNameInput.value.trim().toUpperCase() || 'PLAYER').slice(0, 12);
+        const finalNum = Math.max(1, Math.min(99, parseInt(jerseyNumberInput.value, 10) || 7));
+        appState.localKit.name = finalName;
+        appState.localKit.number = finalNum;
+        jerseyNameInput.value = finalName;
+        jerseyNumberInput.value = finalNum;
+
+        appState.localLockerReady = true;
+        jerseyNameInput.disabled = true;
+        jerseyNumberInput.disabled = true;
+        btnReadyKickoff.disabled = true;
+        btnReadyKickoff.textContent = 'LOCKED IN! WAITING FOR OPPONENT...';
+        btnReadyKickoff.className = 'w-full py-4 rounded-xl font-display text-2xl tracking-wider bg-slate-800 border border-emerald-500/40 text-emerald-300 cursor-not-allowed';
+
+        if (appState.isHost) {
+          appState.hostKit = { ...appState.localKit };
+        } else {
+          appState.guestKit = { ...appState.localKit };
+        }
+
+        sendNet({ type: 'KIT_READY', kit: appState.localKit });
+        checkBothLockerReady();
+      });
+
+      function checkBothLockerReady() {
+        if (appState.localLockerReady && appState.remoteLockerReady) {
+          setTimeout(() => {
+            startMatch();
+          }, 550);
+        }
+      }
+
+      /* =====================================================================
+         7. PENALTY SHOOTOUT STATE MACHINE & NET HANDLERS
+         ===================================================================== */
+      function handleNetMessage(msg) {
+        switch (msg.type) {
+          case 'HELLO':
+            // Handshake confirmation
+            break;
+
+          case 'KIT_READY':
+            appState.remoteLockerReady = true;
+            if (appState.isHost) {
+              appState.guestKit = { ...msg.kit };
+            } else {
+              appState.hostKit = { ...msg.kit };
+            }
+            const oppKit = msg.kit;
+            $('locker-opp-dot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+            $('locker-opp-text').textContent = 'Opponent is Ready!';
+            $('locker-opp-kit-label').textContent = `#${oppKit.number} ${oppKit.name} (${getKit(oppKit.kitId).name})`;
+            $('locker-opp-kit-preview').classList.remove('hidden');
+            $('locker-opp-kit-preview').classList.add('flex');
+            checkBothLockerReady();
+            break;
+
+          case 'CHOICE_SUBMIT':
+            // Only Host processes Guest's secret choice
+            if (!appState.isHost) return;
+            if (msg.kickIndex !== appState.match.kickIndex) return;
+            appState.guestChoiceBuffer = msg.dir;
+            appState.opponentLocked = true;
+            updateTacticalHUD();
+            tryHostResolveKick();
+            break;
+
+          case 'OPPONENT_LOCKED':
+            if (msg.kickIndex === appState.match.kickIndex) {
+              appState.opponentLocked = true;
+              updateTacticalHUD();
+            }
+            break;
+
+          case 'EMOTE':
+            triggerKeeperEmote(msg.emoteId, msg.variant);
+            break;
+
+          case 'KICK_RESULT':
+            if (!appState.isHost) {
+              executeKickAnimationAndUpdate(msg);
+            }
+            break;
+
+          case 'CELEBRATE':
+            playCelebrationAnimation(msg.celebrationId, false);
+            break;
+
+          case 'REMATCH_REQUEST':
+            appState.remoteRematchReady = true;
+            checkRematchStart();
+            break;
+        }
+      }
+
+      function startMatch() {
+        appState.match = createFreshMatchState();
+        appState.localChoice = null;
+        appState.opponentLocked = false;
+        appState.hostChoiceBuffer = null;
+        appState.guestChoiceBuffer = null;
+        appState.isAnimatingKick = false;
+        appState.winnerRole = null;
+        appState.localRematchReady = false;
+        appState.remoteRematchReady = false;
+
+        resetArenaAnimState();
+        showScreen('game');
+        renderScorebug();
+        updateTacticalHUD();
+        sound.playWhistle(0.28);
+        showCenterBanner('KICKOFF!', `${appState.hostKit.name} SHOOTS FIRST`, 'text-emerald-400', 1700);
+      }
+
+      function computeNextMatchState(prev, isGoal) {
+        const next = {
+          kickIndex: prev.kickIndex + 1,
+          hostHistory: [...prev.hostHistory],
+          guestHistory: [...prev.guestHistory],
+          hostScore: prev.hostScore,
+          guestScore: prev.guestScore,
+          isSuddenDeath: prev.isSuddenDeath,
+          finished: false,
+          winner: null
+        };
+
+        const shooter = currentStrikerRole(prev.kickIndex);
+        if (shooter === 'host') {
+          next.hostHistory.push(isGoal);
+          if (isGoal) next.hostScore++;
+        } else {
+          next.guestHistory.push(isGoal);
+          if (isGoal) next.guestScore++;
+        }
+
+        const hTaken = next.hostHistory.length;
+        const gTaken = next.guestHistory.length;
+
+        if (!prev.isSuddenDeath) {
+          const hRem = 5 - hTaken;
+          const gRem = 5 - gTaken;
+
+          // Early mathematical victory check (FIFA rules)
+          if (next.hostScore > next.guestScore + gRem) {
+            next.finished = true;
+            next.winner = 'host';
+          } else if (next.guestScore > next.hostScore + hRem) {
+            next.finished = true;
+            next.winner = 'guest';
+          } else if (hTaken === 5 && gTaken === 5) {
+            // Tied after 5 full rounds -> Sudden Death!
+            next.isSuddenDeath = true;
+          }
+        } else {
+          // Sudden Death: only evaluate after equal kicks in the pair
+          if (hTaken === gTaken && next.hostScore !== next.guestScore) {
+            next.finished = true;
+            next.winner = next.hostScore > next.guestScore ? 'host' : 'guest';
+          }
+        }
+
+        return next;
+      }
+
+      function submitDirection(dir) {
+        if (appState.screen !== 'game' || appState.isAnimatingKick || appState.localChoice || appState.match.finished) {
+          return;
+        }
+        sound.playClick();
+        appState.localChoice = dir;
+
+        if (appState.isHost) {
+          appState.hostChoiceBuffer = dir;
+          sendNet({ type: 'OPPONENT_LOCKED', kickIndex: appState.match.kickIndex });
+          updateTacticalHUD();
+          tryHostResolveKick();
+        } else {
+          sendNet({ type: 'CHOICE_SUBMIT', kickIndex: appState.match.kickIndex, dir });
+          updateTacticalHUD();
+        }
+      }
+
+      function tryHostResolveKick() {
+        if (!appState.isHost) return;
+        if (!appState.hostChoiceBuffer || !appState.guestChoiceBuffer) return;
+
+        const strikerIsHost = currentStrikerRole() === 'host';
+        const strikerDir = strikerIsHost ? appState.hostChoiceBuffer : appState.guestChoiceBuffer;
+        const keeperDir = strikerIsHost ? appState.guestChoiceBuffer : appState.hostChoiceBuffer;
+        const isGoal = strikerDir !== keeperDir;
+
+        const nextMatch = computeNextMatchState(appState.match, isGoal);
+
+        const payload = {
+          type: 'KICK_RESULT',
+          kickIndex: appState.match.kickIndex,
+          strikerDir,
+          keeperDir,
+          isGoal,
+          nextMatch
+        };
+
+        appState.hostChoiceBuffer = null;
+        appState.guestChoiceBuffer = null;
+
+        sendNet(payload);
+        executeKickAnimationAndUpdate(payload);
+      }
+
+      /* Tactical Button & Keyboard Listeners */
+      document.querySelectorAll('#tactical-controls button[data-dir]').forEach(btn => {
+        btn.addEventListener('click', () => submitDirection(btn.dataset.dir));
+      });
+
+      window.addEventListener('keydown', e => {
+        if (appState.screen !== 'game') return;
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === '1') {
+          submitDirection('left');
+        } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === '2') {
+          submitDirection('center');
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' || e.key === '3') {
+          submitDirection('right');
+        }
+      });
+
+      /* Keeper Emotes */
+      document.querySelectorAll('#keeper-emote-bar button[data-emote]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (isLocalStriker() || appState.isAnimatingKick) return;
+          const now = Date.now();
+          if (now - appState.lastEmoteTime < 750) return;
+          appState.lastEmoteTime = now;
+
+          const emoteId = btn.dataset.emote;
+          const variant = Math.floor(Math.random() * 3);
+          triggerKeeperEmote(emoteId, variant);
+          sendNet({ type: 'EMOTE', emoteId, variant });
+        });
+      });
+
+      /* =====================================================================
+         8. BROADCAST SCOREBUG & TACTICAL HUD RENDERING
+         ===================================================================== */
+      function renderScorebug() {
+        const m = appState.match;
+        const hKit = getKit(appState.hostKit.kitId);
+        const gKit = getKit(appState.guestKit.kitId);
+
+        $('sb-host-swatch').style.background = hKit.primary;
+        $('sb-host-name').textContent = appState.hostKit.name;
+        $('sb-host-score').textContent = m.hostScore;
+
+        $('sb-guest-swatch').style.background = gKit.primary;
+        $('sb-guest-name').textContent = appState.guestKit.name;
+        $('sb-guest-score').textContent = m.guestScore;
+
+        const roundNum = Math.floor(m.kickIndex / 2) + 1;
+        $('hud-round-label').textContent = m.isSuddenDeath ? `SD ROUND ${roundNum - 5}` : `ROUND ${Math.min(5, roundNum)} / 5`;
+
+        if (m.isSuddenDeath) {
+          $('hud-sd-badge').classList.remove('hidden');
+        } else {
+          $('hud-sd-badge').classList.add('hidden');
+        }
+
+        const totalSlots = Math.max(5, m.hostHistory.length, m.guestHistory.length, m.isSuddenDeath ? Math.floor(m.kickIndex / 2) + 1 : 5);
+        renderPenaltyDots($('sb-host-dots'), m.hostHistory, totalSlots, currentStrikerRole() === 'host' && !m.finished);
+        renderPenaltyDots($('sb-guest-dots'), m.guestHistory, totalSlots, currentStrikerRole() === 'guest' && !m.finished);
+      }
+
+      function renderPenaltyDots(container, history, totalSlots, isActiveShooter) {
+        container.innerHTML = '';
+        for (let i = 0; i < totalSlots; i++) {
+          const dot = document.createElement('span');
+          const base = 'w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border transition-all duration-300 flex items-center justify-center text-[8px] font-bold ';
+          if (i < history.length) {
+            if (history[i]) {
+              dot.className = base + 'bg-emerald-500 border-emerald-300 text-slate-950 shadow-[0_0_8px_rgba(16,185,129,0.75)]';
+              dot.textContent = '✓';
+            } else {
+              dot.className = base + 'bg-rose-500 border-rose-300 text-white shadow-[0_0_8px_rgba(244,63,94,0.65)]';
+              dot.textContent = '✕';
+            }
+          } else if (i === history.length && isActiveShooter) {
+            dot.className = base + 'bg-amber-400/25 border-amber-300 animate-pulse';
+          } else {
+            dot.className = base + 'bg-slate-900/80 border-white/20';
+          }
+          container.appendChild(dot);
+        }
+      }
+
+      function updateTacticalHUD() {
+        const localIsStriker = isLocalStriker();
+        const roleLabel = $('hud-role-label');
+        roleLabel.textContent = localIsStriker ? 'YOUR TURN: STRIKER ⚽' : 'YOUR TURN: GOALKEEPER 🧤';
+        roleLabel.className = localIsStriker ? 'text-emerald-300' : 'text-cyan-300';
+
+        // Button labels
+        $('lbl-dir-left').textContent = localIsStriker ? 'SHOOT LEFT' : 'DIVE LEFT';
+        $('lbl-dir-center').textContent = localIsStriker ? 'PANENKA' : 'STAY CENTER';
+        $('lbl-dir-right').textContent = localIsStriker ? 'SHOOT RIGHT' : 'DIVE RIGHT';
+
+        // Emote bar only for keeper while choosing
+        if (!localIsStriker && !appState.isAnimatingKick && !appState.match.finished) {
+          $('keeper-emote-bar').classList.remove('hidden');
+          $('keeper-emote-bar').classList.add('flex');
+        } else {
+          $('keeper-emote-bar').classList.add('hidden');
+          $('keeper-emote-bar').classList.remove('flex');
+        }
+
+        // Controls lock state
+        const disabled = appState.isAnimatingKick || !!appState.localChoice || appState.match.finished;
+        document.querySelectorAll('#tactical-controls button[data-dir]').forEach(btn => {
+          btn.disabled = disabled;
+          const dir = btn.dataset.dir;
+          if (appState.localChoice === dir) {
+            btn.classList.add('border-amber-400', 'bg-amber-500/20', 'shadow-[0_0_20px_rgba(251,191,36,0.3)]');
+            btn.classList.remove('border-white/15', 'opacity-45');
+          } else if (appState.localChoice) {
+            btn.classList.remove('border-amber-400', 'bg-amber-500/20', 'shadow-[0_0_20px_rgba(251,191,36,0.3)]');
+            btn.classList.add('border-white/15', 'opacity-45');
+          } else {
+            btn.classList.remove('border-amber-400', 'bg-amber-500/20', 'shadow-[0_0_20px_rgba(251,191,36,0.3)]', 'opacity-45');
+            btn.classList.add('border-white/15');
+          }
+        });
+
+        // Status pill
+        const pillText = $('tactical-status-text');
+        const pillDot = $('tactical-status-dot');
+        if (appState.isAnimatingKick) {
+          pillDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-ping';
+          pillText.textContent = 'Kick in progress...';
+        } else if (appState.localChoice) {
+          pillDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+          pillText.textContent = 'Locked In! Waiting for opponent...';
+        } else if (appState.opponentLocked) {
+          pillDot.className = 'w-2 h-2 rounded-full bg-cyan-400 animate-ping';
+          pillText.textContent = localIsStriker
+            ? 'Keeper has committed! Pick your corner!'
+            : 'Striker is ready! Pick your dive!';
+        } else {
+          pillDot.className = 'w-2 h-2 rounded-full bg-slate-400';
+          pillText.textContent = localIsStriker
+            ? 'Secretly choose Left, Panenka, or Right'
+            : 'Secretly choose Dive Left, Center, or Dive Right';
+        }
+      }
+
+      let bannerTimer = null;
+      function showCenterBanner(mainText, subText, colorClass = 'text-white', duration = 2000) {
+        const wrap = $('center-banner');
+        const main = $('center-banner-main');
+        const sub = $('center-banner-sub');
+
+        if (bannerTimer) clearTimeout(bannerTimer);
+        wrap.classList.remove('hidden', 'animate-banner');
+        void wrap.offsetWidth;
+        main.textContent = mainText;
+        main.className = `font-display text-7xl sm:text-9xl tracking-wider drop-shadow-[0_10px_35px_rgba(0,0,0,0.85)] leading-none ${colorClass}`;
+        sub.textContent = subText;
+        wrap.classList.add('animate-banner');
+
+        bannerTimer = setTimeout(() => {
+          wrap.classList.add('hidden');
+          wrap.classList.remove('animate-banner');
+        }, duration);
+      }
+
+      /* =====================================================================
+         9. 3RD-PERSON STADIUM CANVAS ENGINE & KICK PHYSICS
+         ===================================================================== */
+      const stadiumCanvas = $('stadium-canvas');
+      const sCtx = stadiumCanvas.getContext('2d');
+
+      const victoryCanvas = $('victory-canvas');
+      const vCtx = victoryCanvas.getContext('2d');
+
+      function resizeCanvas(canvas) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      window.addEventListener('resize', () => {
+        if (appState.screen === 'game') resizeCanvas(stadiumCanvas);
+        if (appState.screen === 'victory') resizeCanvas(victoryCanvas);
+      });
+
+      // Crowd spectators generated once for stadium
+      const crowdDots = Array.from({ length: 240 }, () => ({
+        xNorm: Math.random(),
+        yNorm: Math.random(),
+        color: ['#e2e8f0', '#38bdf8', '#34d399', '#fbbf24', '#f87171', '#94a3b8'][Math.floor(Math.random() * 6)],
+        phase: Math.random() * Math.PI * 2,
+        speed: 2.5 + Math.random() * 3.5
+      }));
+
+      const EMOTE_TEXTS = {
+        wave: ['COME ON!!', 'TOO EASY!', 'OVER HERE!'],
+        point: ['GOING LEFT?', 'I KNOW WHERE!', 'RIGHT THERE!'],
+        trash: ['NOT TODAY!', 'FEELING NERVOUS?', 'MY HOUSE!']
+      };
+
+      const animState = {
+        phase: 'idle', // idle | runup | flight | impact
+        phaseStart: 0,
+        activeKickIndex: 0,
+        strikerDir: 'center',
+        keeperDir: 'center',
+        isGoal: false,
+        pendingNextMatch: null,
+
+        // Ball kinematics (normalized goal/pitch coords)
+        ballPos: { x: 0, y: 0, z: 0 }, // x: -1..1, y: 0(spot)..1(goal line), z: height
+        ballTarget: { x: 0, z: 0.3 },
+        ballDeflect: { vx: 0, vy: 0, vz: 0 },
+
+        // Net physics ripple
+        netRipple: 0,
+        netHitX: 0,
+        netHitZ: 0.4,
+
+        // Flashbulbs & particles
+        flashes: [],
+        particles: [],
+
+        // Keeper emote
+        emote: null, // { id, text, start, duration }
+
+        // Victory Celebration
+        celeb: null // { id, start, duration }
+      };
+
+      function resetArenaAnimState() {
+        animState.phase = 'idle';
+        animState.ballPos = { x: 0, y: 0, z: 0 };
+        animState.netRipple = 0;
+        animState.particles = [];
+        animState.flashes = [];
+        animState.emote = null;
+      }
+
+      function triggerKeeperEmote(emoteId, variant = 0) {
+        sound.playEmote();
+        const list = EMOTE_TEXTS[emoteId] || ['COME ON!'];
+        animState.emote = {
+          id: emoteId,
+          variant,
+          text: list[variant % list.length],
+          start: performance.now(),
+          duration: 1850
+        };
+      }
+
+      function executeKickAnimationAndUpdate(payload) {
+        appState.isAnimatingKick = true;
+        appState.localChoice = null;
+        appState.opponentLocked = false;
+        animState.emote = null;
+        updateTacticalHUD();
+
+        animState.phase = 'runup';
+        animState.phaseStart = performance.now();
+        animState.activeKickIndex = payload.kickIndex;
+        animState.strikerDir = payload.strikerDir;
+        animState.keeperDir = payload.keeperDir;
+        animState.isGoal = payload.isGoal;
+        animState.pendingNextMatch = payload.nextMatch;
+        animState.ballPos = { x: 0, y: 0, z: 0 };
+
+        // Target coordinates inside goal mouth (x in [-0.72, 0.72], z in [0.22, 0.76])
+        if (payload.strikerDir === 'left') {
+          animState.ballTarget = { x: -0.74, z: 0.68 };
+        } else if (payload.strikerDir === 'right') {
+          animState.ballTarget = { x: 0.74, z: 0.68 };
+        } else {
+          animState.ballTarget = { x: 0, z: 0.56 };
+        }
+
+        sound.playWhistle(0.32);
+
+        // Timeline orchestration
+        setTimeout(() => {
+          if (appState.screen !== 'game') return;
+          animState.phase = 'flight';
+          animState.phaseStart = performance.now();
+          sound.playKick();
+        }, 560);
+
+        setTimeout(() => {
+          if (appState.screen !== 'game') return;
+          animState.phase = 'impact';
+          animState.phaseStart = performance.now();
+
+          if (payload.isGoal) {
+            animState.netRipple = 1.0;
+            animState.netHitX = animState.ballTarget.x;
+            animState.netHitZ = animState.ballTarget.z;
+            sound.playGoalRoar();
+            spawnArenaBurst(payload.strikerDir, true);
+            const sub = payload.strikerDir === 'center' ? 'CHEEKY PANENKA CHIP!' : 'INTO THE TOP CORNER!';
+            showCenterBanner(payload.strikerDir === 'center' ? 'PANENKA!' : 'GOAL!', sub, 'text-emerald-400', 1800);
+          } else {
+            sound.playSave();
+            spawnArenaBurst(payload.keeperDir, false);
+            stadiumCanvas.classList.add('shake-screen');
+            setTimeout(() => stadiumCanvas.classList.remove('shake-screen'), 500);
+            showCenterBanner('SAVED!', 'INCREDIBLE STOP BY THE KEEPER!', 'text-rose-400', 1800);
+          }
+
+          // Commit scorebug update immediately at impact
+          const wasSD = appState.match.isSuddenDeath;
+          appState.match = payload.nextMatch;
+          renderScorebug();
+
+          if (!wasSD && appState.match.isSuddenDeath && !appState.match.finished) {
+            setTimeout(() => {
+              sound.playWhistle(0.45);
+              showCenterBanner('SUDDEN DEATH', '1-FOR-1 • NEXT MISS COULD BE FATAL!', 'text-amber-300 sudden-death-text', 2100);
+            }, 1350);
+          }
+        }, 1080);
+
+        const advanceDelay = (!appState.match.isSuddenDeath && payload.nextMatch.isSuddenDeath) ? 3800 : 2750;
+        setTimeout(() => {
+          if (appState.screen !== 'game') return;
+          appState.isAnimatingKick = false;
+
+          if (appState.match.finished) {
+            enterVictoryScreen(appState.match.winner);
+          } else {
+            animState.phase = 'idle';
+            animState.ballPos = { x: 0, y: 0, z: 0 };
+            updateTacticalHUD();
+            renderScorebug();
+          }
+        }, advanceDelay);
+      }
+
+      function spawnArenaBurst(dir, isGoal) {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const goalY = h * 0.40;
+        const goalHalfW = Math.min(w * 0.34, 270);
+        const xOffset = dir === 'left' ? -goalHalfW * 0.65 : dir === 'right' ? goalHalfW * 0.65 : 0;
+        const cx = w / 2 + xOffset;
+        const cy = goalY - 25;
+
+        const count = isGoal ? 48 : 30;
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 2 + Math.random() * 6.5;
+          animState.particles.push({
+            x: cx,
+            y: cy,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 2.5,
+            size: 3 + Math.random() * 4,
+            color: isGoal
+              ? ['#34d399', '#fbbf24', '#38bdf8', '#ffffff'][Math.floor(Math.random() * 4)]
+              : ['#f43f5e', '#ffffff', '#38bdf8'][Math.floor(Math.random() * 3)],
+            life: 1.0,
+            decay: 0.016 + Math.random() * 0.014
+          });
+        }
+
+        if (isGoal) {
+          for (let i = 0; i < 18; i++) {
+            animState.flashes.push({
+              x: Math.random() * w,
+              y: h * (0.1 + Math.random() * 0.24),
+              r: 12 + Math.random() * 26,
+              life: 1.0,
+              delay: Math.random() * 650
+            });
+          }
+        }
+      }
+
+      /* Drawing Helpers for Kits & Characters */
+      /* ===== REALISTIC JOINTED HUMAN RIG (shaded limbs, face, hair, boots, gloves) ===== */
+      const SKINS = ['#f1c9a0', '#e0ac69', '#c68642', '#8d5524', '#5c3a21'];
+      const HAIRS = ['#1b1b1b', '#3b2417', '#a0652a', '#d9b25a', '#0f0f0f'];
+      function hashStr(s) { let h = 7; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
+      function shade(hex, a) {
+        if (!/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+        const n = parseInt(hex.slice(1), 16);
+        const f = v => Math.max(0, Math.min(255, Math.round(a < 0 ? v * (1 + a) : v + (255 - v) * a)));
+        return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+      }
+      function limb(ctx, x, y, ang, len, r0, r1, col, sx) {
+        const ex = x + sx * Math.sin(ang) * len, ey = y + Math.cos(ang) * len;
+        const dx = ex - x, dy = ey - y, d = Math.hypot(dx, dy) || 1, nx = -dy / d, ny = dx / d;
+        const g = ctx.createLinearGradient(x - nx * r0, y - ny * r0, x + nx * r0, y + ny * r0);
+        g.addColorStop(0, shade(col, -0.32)); g.addColorStop(0.42, col); g.addColorStop(1, shade(col, -0.42));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(x + nx * r0, y + ny * r0);
+        ctx.lineTo(ex + nx * r1, ey + ny * r1);
+        const a = Math.atan2(ny, nx);
+        ctx.arc(ex, ey, r1, a, a - Math.PI, true);
+        ctx.lineTo(x - nx * r0, y - ny * r0);
+        ctx.arc(x, y, r0, a + Math.PI, a, true);
+        ctx.fill();
+        return [ex, ey, Math.atan2(dy, dx)];
+      }
+      function drawPerson(ctx, o) {
+        const k = o.kit, back = o.view === 'back', hs = hashStr((o.kitObj && o.kitObj.name) || 'X');
+        const skin = SKINS[hs % 5], hair = HAIRS[(hs >> 3) % 5];
+        const cr = o.crouch || 0, hipY = -98 + cr, shY = -154 + cr * 1.1, lean = o.lean || 0;
+        ctx.save();
+        // Legs: thigh (skin) -> shin (sock) -> boot
+        o.legs.forEach((lg, i) => {
+          const s = i ? 1 : -1, hx = s * 9;
+          const kn = limb(ctx, hx, hipY + 6, lg[0], 44, 10, 7.5, skin, s);
+          const ft = limb(ctx, kn[0], kn[1], lg[0] + lg[1], 44, 7, 5.5, k.socks, s);
+          limb(ctx, kn[0], kn[1], lg[0] + lg[1], 20, 7.2, 6.4, shade(k.socks, 0.12), s);
+          ctx.save(); ctx.translate(ft[0], ft[1] + 1); ctx.rotate((lg[0] + lg[1]) * -s * 0.6);
+          const bg = ctx.createLinearGradient(0, -5, 0, 7); bg.addColorStop(0, '#2b3445'); bg.addColorStop(1, '#05070b');
+          ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(s * 1.5, 1, back ? 7 : 8.5, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(s * 1.5 - 4, 3.5, 8, 1.4); ctx.restore();
+        });
+        ctx.save(); ctx.translate(0, hipY); ctx.rotate(lean); ctx.translate(0, -hipY);
+        // Shorts
+        const sg = ctx.createLinearGradient(-20, 0, 20, 0);
+        sg.addColorStop(0, shade(k.shorts, -0.3)); sg.addColorStop(0.5, k.shorts); sg.addColorStop(1, shade(k.shorts, -0.35));
+        ctx.fillStyle = sg; ctx.beginPath();
+        ctx.moveTo(-17, hipY - 8); ctx.lineTo(17, hipY - 8); ctx.lineTo(22, hipY + 28); ctx.lineTo(2, hipY + 26);
+        ctx.lineTo(0, hipY + 10); ctx.lineTo(-2, hipY + 26); ctx.lineTo(-22, hipY + 28); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 1.2; ctx.stroke();
+        // Arms behind torso edge: draw after torso so sleeves overlap shoulders
+        const torsoH = hipY - shY + 6;
+        if (back) {
+          drawJerseyBack(ctx, 0, shY, 58, torsoH, k, o.kitObj.name, o.kitObj.number);
+        } else {
+          const tg = ctx.createLinearGradient(-24, 0, 24, 0);
+          tg.addColorStop(0, shade(k.primary, -0.28)); tg.addColorStop(0.5, k.primary); tg.addColorStop(1, shade(k.primary, -0.38));
+          ctx.fillStyle = tg; ctx.beginPath(); ctx.roundRect(-24, shY, 48, torsoH, [10, 10, 6, 6]); ctx.fill();
+          if (k.stripes) { ctx.fillStyle = k.stripeColor; for (let i = -3; i <= 3; i += 2) ctx.fillRect(i * 7 - 3.5, shY, 7, torsoH); }
+          ctx.fillStyle = skin; ctx.beginPath(); ctx.moveTo(-7, shY); ctx.lineTo(7, shY); ctx.lineTo(0, shY + 13); ctx.fill();
+          ctx.strokeStyle = k.secondary; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-8, shY); ctx.lineTo(0, shY + 14); ctx.lineTo(8, shY); ctx.stroke();
+          ctx.fillStyle = k.textColor; ctx.font = '900 22px "Bebas Neue", Impact, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(String(o.kitObj.number), 0, shY + 30);
+        }
+        // Arms: sleeve + skin forearm + hand/glove
+        o.arms.forEach((ar, i) => {
+          const s = i ? 1 : -1, sx0 = s * 22, sy0 = shY + 6;
+          const el = limb(ctx, sx0, sy0, ar[0], 30, 7, 5.6, skin, s);
+          limb(ctx, sx0, sy0, ar[0], 17, 8.4, 7.4, k.primary, s);
+          const hd = limb(ctx, el[0], el[1], ar[0] + ar[1], 28, 5.4, 4.2, skin, s);
+          if (o.gloves) { ctx.fillStyle = o.gloves; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(hd[0], hd[1], 7.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+          else { ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(hd[0], hd[1], 4.8, 0, Math.PI * 2); ctx.fill(); }
+        });
+        // Neck + head
+        ctx.fillStyle = shade(skin, -0.22); ctx.fillRect(-5.5, shY - 12, 11, 14);
+        ctx.save(); ctx.translate(0, shY - 25); ctx.rotate(o.headTilt || 0);
+        const hg = ctx.createRadialGradient(-3, -4, 2, 0, 0, 16);
+        hg.addColorStop(0, shade(skin, 0.12)); hg.addColorStop(1, shade(skin, -0.25));
+        ctx.fillStyle = hg;
+        ctx.beginPath(); ctx.ellipse(-11.5, 1, 2.6, 4, 0, 0, Math.PI * 2); ctx.ellipse(11.5, 1, 2.6, 4, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0, 0, 11.5, 14, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = hair;
+        if (back) {
+          ctx.beginPath(); ctx.ellipse(0, -2, 12, 13.5, 0, Math.PI * 0.98, Math.PI * 2.02); ctx.lineTo(10, 6); ctx.quadraticCurveTo(0, 11, -10, 6); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.ellipse(0, -2.5, 12, 13, 0, Math.PI, Math.PI * 2); ctx.quadraticCurveTo(0, -8, -11.5, -2); ctx.fill();
+          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-4.6, -1, 2.4, 1.5, 0, 0, Math.PI * 2); ctx.ellipse(4.6, -1, 2.4, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(-4.6, -1, 1.1, 0, Math.PI * 2); ctx.arc(4.6, -1, 1.1, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = hair; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-7.5, -4.4); ctx.lineTo(-2.5, -3.8); ctx.moveTo(7.5, -4.4); ctx.lineTo(2.5, -3.8); ctx.stroke();
+          ctx.strokeStyle = shade(skin, -0.35); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, -1); ctx.lineTo(-1.2, 3.5); ctx.lineTo(1.2, 3.5); ctx.stroke();
+          ctx.fillStyle = '#5a1f1f';
+          if (o.mouthOpen) { ctx.beginPath(); ctx.ellipse(0, 7.5, 3.6, 2.8, 0, 0, Math.PI * 2); ctx.fill(); }
+          else { ctx.strokeStyle = '#7a3b3b'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-3, 7.5); ctx.quadraticCurveTo(0, 8.8, 3, 7.5); ctx.stroke(); }
+        }
+        ctx.restore();
+        ctx.restore(); ctx.restore();
+      }
+
+      function drawJerseyBack(ctx, x, y, width, height, kit, playerName, playerNum) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Torso polygon
+        const hw = width / 2;
+        ctx.beginPath();
+        ctx.moveTo(-hw * 0.72, 0);
+        ctx.lineTo(hw * 0.72, 0);
+        ctx.lineTo(hw * 1.38, height * 0.28);
+        ctx.lineTo(hw * 1.15, height * 0.44);
+        ctx.lineTo(hw * 0.92, height * 0.34);
+        ctx.lineTo(hw * 0.88, height);
+        ctx.lineTo(-hw * 0.88, height);
+        ctx.lineTo(-hw * 0.92, height * 0.34);
+        ctx.lineTo(-hw * 1.15, height * 0.44);
+        ctx.lineTo(-hw * 1.38, height * 0.28);
+        ctx.closePath();
+
+        ctx.save();
+        ctx.clip();
+        ctx.fillStyle = kit.primary;
+        ctx.fillRect(-hw * 1.5, 0, width * 1.6, height);
+
+        if (kit.stripes) {
+          ctx.fillStyle = kit.stripeColor;
+          const sw = width * 0.16;
+          ctx.fillRect(-hw * 0.65, 0, sw, height);
+          ctx.fillRect(-sw / 2, 0, sw, height);
+          ctx.fillRect(hw * 0.65 - sw, 0, sw, height);
+        }
+
+        // Shoulder accents
+        ctx.fillStyle = kit.secondary;
+        ctx.fillRect(-hw * 1.4, 0, hw * 0.75, height * 0.14);
+        ctx.fillRect(hw * 0.65, 0, hw * 0.75, height * 0.14);
+        ctx.restore();
+
+        // Subtle outline
+        ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Collar
+        ctx.fillStyle = kit.secondary;
+        ctx.beginPath();
+        ctx.ellipse(0, 2, hw * 0.38, height * 0.08, 0, 0, Math.PI);
+        ctx.fill();
+
+        // Jersey Name (crisp athletic font)
+        const nameFontSize = Math.max(10, Math.round(height * (playerName.length > 9 ? 0.14 : 0.175)));
+        ctx.font = `900 ${nameFontSize}px "Bebas Neue", Impact, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = kit.textStroke;
+        ctx.strokeText(playerName, 0, height * 0.26);
+        ctx.fillStyle = kit.textColor;
+        ctx.fillText(playerName, 0, height * 0.26);
+
+        // Jersey Number
+        const numFontSize = Math.max(20, Math.round(height * 0.56));
+        ctx.font = `900 ${numFontSize}px "Bebas Neue", Impact, sans-serif`;
+        ctx.lineWidth = 3;
+        ctx.strokeText(String(playerNum), 0, height * 0.67);
+        ctx.fillText(String(playerNum), 0, height * 0.67);
+
+        ctx.restore();
+      }
+
+      function drawStadiumScene(now) {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        sCtx.clearRect(0, 0, w, h);
+
+        // 1. Night Sky & Stadium Roof
+        const skyGrad = sCtx.createLinearGradient(0, 0, 0, h * 0.45);
+        skyGrad.addColorStop(0, '#020617');
+        skyGrad.addColorStop(1, '#0f172a');
+        sCtx.fillStyle = skyGrad;
+        sCtx.fillRect(0, 0, w, h * 0.45);
+
+        // Volumetric Floodlights
+        const lights = [w * 0.14, w * 0.34, w * 0.66, w * 0.86];
+        lights.forEach(lx => {
+          const beam = sCtx.createLinearGradient(lx, 12, w / 2, h * 0.72);
+          beam.addColorStop(0, 'rgba(224, 242, 254, 0.22)');
+          beam.addColorStop(1, 'rgba(224, 242, 254, 0)');
+          sCtx.fillStyle = beam;
+          sCtx.beginPath();
+          sCtx.moveTo(lx - 22, 12);
+          sCtx.lineTo(lx + 22, 12);
+          sCtx.lineTo(lx + 140, h * 0.7);
+          sCtx.lineTo(lx - 140, h * 0.7);
+          sCtx.closePath();
+          sCtx.fill();
+
+          sCtx.fillStyle = '#e0f2fe';
+          sCtx.beginPath();
+          sCtx.arc(lx, 18, 9, 0, Math.PI * 2);
+          sCtx.fill();
+        });
+
+        // 2. Crowd Tiers
+        const horizonY = h * 0.41;
+        sCtx.fillStyle = '#091120';
+        sCtx.fillRect(0, h * 0.13, w, horizonY - h * 0.13);
+
+        // Animated Spectators
+        const excitement = animState.phase === 'impact' && animState.isGoal ? 7.5 : 1.8;
+        crowdDots.forEach(d => {
+          const cx = d.xNorm * w;
+          const cy = h * 0.15 + d.yNorm * (horizonY - h * 0.18) + Math.sin(now * 0.004 * d.speed + d.phase) * excitement;
+          sCtx.fillStyle = d.color;
+          sCtx.globalAlpha = 0.65;
+          sCtx.fillRect(cx, cy, 4, 4);
+        });
+        sCtx.globalAlpha = 1;
+
+        // LED Advertising Boards
+        sCtx.fillStyle = '#020617';
+        sCtx.fillRect(0, horizonY - 20, w, 20);
+        const ledGrad = sCtx.createLinearGradient(0, 0, w, 0);
+        ledGrad.addColorStop(0, '#059669');
+        ledGrad.addColorStop(0.5, '#0284c7');
+        ledGrad.addColorStop(1, '#059669');
+        sCtx.fillStyle = ledGrad;
+        sCtx.globalAlpha = 0.85;
+        sCtx.fillRect(0, horizonY - 17, w, 13);
+        sCtx.globalAlpha = 1;
+
+        // Stadium Flashes
+        for (let i = animState.flashes.length - 1; i >= 0; i--) {
+          const f = animState.flashes[i];
+          if (f.delay > 0) { f.delay -= 16; continue; }
+          sCtx.fillStyle = `rgba(255,255,255,${f.life * 0.85})`;
+          sCtx.beginPath();
+          sCtx.arc(f.x, f.y, f.r * (1.2 - f.life * 0.5), 0, Math.PI * 2);
+          sCtx.fill();
+          f.life -= 0.07;
+          if (f.life <= 0) animState.flashes.splice(i, 1);
+        }
+
+        // 3. Mowed Emerald Turf
+        const turfGrad = sCtx.createLinearGradient(0, horizonY, 0, h);
+        turfGrad.addColorStop(0, '#065f46');
+        turfGrad.addColorStop(0.4, '#047857');
+        turfGrad.addColorStop(1, '#064e3b');
+        sCtx.fillStyle = turfGrad;
+        sCtx.fillRect(0, horizonY, w, h - horizonY);
+
+        // Perspective Turf Stripes
+        const stripeCount = 8;
+        for (let i = 0; i < stripeCount; i++) {
+          if (i % 2 === 0) {
+            const y1 = horizonY + ((h - horizonY) * i) / stripeCount;
+            const y2 = horizonY + ((h - horizonY) * (i + 1)) / stripeCount;
+            sCtx.fillStyle = 'rgba(16, 185, 129, 0.11)';
+            sCtx.fillRect(0, y1, w, y2 - y1);
+          }
+        }
+
+        // Pitch Lines (Goal Line, 18-yd box perspective, Penalty Spot)
+        const goalHalfW = Math.min(w * 0.34, 265);
+        const goalH = Math.min(h * 0.22, 165);
+        const goalLineY = horizonY + 18;
+        const spotX = w / 2;
+        const spotY = h * 0.73;
+
+        sCtx.strokeStyle = 'rgba(255, 255, 255, 0.68)';
+        sCtx.lineWidth = 3;
+        // Goal line
+        sCtx.beginPath();
+        sCtx.moveTo(0, goalLineY);
+        sCtx.lineTo(w, goalLineY);
+        sCtx.stroke();
+
+        // 6-yard box
+        sCtx.beginPath();
+        sCtx.moveTo(w / 2 - goalHalfW * 1.25, goalLineY);
+        sCtx.lineTo(w / 2 - goalHalfW * 1.55, goalLineY + 55);
+        sCtx.lineTo(w / 2 + goalHalfW * 1.55, goalLineY + 55);
+        sCtx.lineTo(w / 2 + goalHalfW * 1.25, goalLineY);
+        sCtx.stroke();
+
+        // Penalty spot
+        sCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        sCtx.beginPath();
+        sCtx.ellipse(spotX, spotY, 10, 4, 0, 0, Math.PI * 2);
+        sCtx.fill();
+
+        // 4. Goal Frame & Physics-Rippling Net
+        const gxL = w / 2 - goalHalfW;
+        const gxR = w / 2 + goalHalfW;
+        const gTop = goalLineY - goalH;
+        const backInset = 24;
+
+        if (animState.netRipple > 0.01) {
+          animState.netRipple *= 0.955;
+        } else {
+          animState.netRipple = 0;
+        }
+
+        // Net Back Wall
+        sCtx.fillStyle = 'rgba(15, 23, 42, 0.28)';
+        sCtx.fillRect(gxL + backInset, gTop + 10, goalHalfW * 2 - backInset * 2, goalH - 10);
+
+        sCtx.strokeStyle = 'rgba(226, 232, 240, 0.34)';
+        sCtx.lineWidth = 1;
+        const cols = 18;
+        const rows = 8;
+        const rippleAmp = animState.netRipple * 18 * Math.sin(now * 0.032);
+        const hitPxX = w / 2 + animState.netHitX * (goalHalfW - 20);
+        const hitPxY = goalLineY - animState.netHitZ * goalH;
+
+        for (let c = 0; c <= cols; c++) {
+          const xBase = gxL + backInset + ((goalHalfW * 2 - backInset * 2) * c) / cols;
+          sCtx.beginPath();
+          for (let r = 0; r <= rows; r++) {
+            const yBase = gTop + 10 + ((goalH - 10) * r) / rows;
+            const dist = Math.hypot(xBase - hitPxX, yBase - hitPxY);
+            const disp = Math.max(0, 1 - dist / 150) * rippleAmp;
+            const px = xBase + disp * 0.5;
+            const py = yBase - disp * 0.4;
+            if (r === 0) sCtx.moveTo(px, py);
+            else sCtx.lineTo(px, py);
+          }
+          sCtx.stroke();
+        }
+        for (let r = 0; r <= rows; r++) {
+          const yBase = gTop + 10 + ((goalH - 10) * r) / rows;
+          sCtx.beginPath();
+          for (let c = 0; c <= cols; c++) {
+            const xBase = gxL + backInset + ((goalHalfW * 2 - backInset * 2) * c) / cols;
+            const dist = Math.hypot(xBase - hitPxX, yBase - hitPxY);
+            const disp = Math.max(0, 1 - dist / 150) * rippleAmp;
+            const px = xBase + disp * 0.5;
+            const py = yBase - disp * 0.4;
+            if (c === 0) sCtx.moveTo(px, py);
+            else sCtx.lineTo(px, py);
+          }
+          sCtx.stroke();
+        }
+
+        // Goal Posts & Crossbar
+        sCtx.strokeStyle = '#f8fafc';
+        sCtx.lineWidth = 7;
+        sCtx.lineCap = 'round';
+        sCtx.lineJoin = 'round';
+        sCtx.beginPath();
+        sCtx.moveTo(gxL, goalLineY);
+        sCtx.lineTo(gxL, gTop);
+        sCtx.lineTo(gxR, gTop);
+        sCtx.lineTo(gxR, goalLineY);
+        sCtx.stroke();
+
+        // 5. Goalkeeper on Goal Line
+        const activeIdx = animState.phase === 'idle' ? appState.match.kickIndex : animState.activeKickIndex;
+        const strikerIsHost = currentStrikerRole(activeIdx) === 'host';
+        const strikerKitObj = strikerIsHost ? appState.hostKit : appState.guestKit;
+        const keeperKitObj = strikerIsHost ? appState.guestKit : appState.hostKit;
+        const sKit = getKit(strikerKitObj.kitId);
+        const kKit = getKit(keeperKitObj.kitId);
+
+        drawGoalkeeper(sCtx, w / 2, goalLineY, goalHalfW, goalH, kKit, keeperKitObj, now);
+
+        // 6. Ball Trajectory & Rendering
+        let ballScreenX = spotX;
+        let ballScreenY = spotY;
+        let ballScale = 1.0;
+
+        if (animState.phase === 'flight') {
+          const t = Math.min(1, (now - animState.phaseStart) / 520);
+          const easeT = 1 - Math.pow(1 - t, 2);
+          const targetX = w / 2 + animState.ballTarget.x * (goalHalfW - 22);
+          const targetY = goalLineY - animState.ballTarget.z * (goalH - 18);
+
+          ballScreenX = spotX + (targetX - spotX) * easeT;
+          let arcLift = 0;
+          if (animState.strikerDir === 'center') {
+            // Panenka chip high arc!
+            arcLift = Math.sin(t * Math.PI) * 95;
+          } else {
+            arcLift = Math.sin(t * Math.PI) * 28;
+          }
+          ballScreenY = spotY + (targetY - spotY) * easeT - arcLift;
+          ballScale = 1 - 0.56 * easeT;
+        } else if (animState.phase === 'impact') {
+          const t = Math.min(1, (now - animState.phaseStart) / 900);
+          const targetX = w / 2 + animState.ballTarget.x * (goalHalfW - 22);
+          const targetY = goalLineY - animState.ballTarget.z * (goalH - 18);
+
+          if (animState.isGoal) {
+            // Settle into bottom of net
+            ballScreenX = targetX;
+            ballScreenY = targetY + Math.min(1, t * 2.2) * (goalLineY - targetY - 10);
+            ballScale = 0.42;
+          } else {
+            // Parried away cleanly!
+            const deflectDir = animState.keeperDir === 'left' ? -1 : animState.keeperDir === 'right' ? 1 : 0.4;
+            ballScreenX = targetX + deflectDir * t * 150;
+            ballScreenY = targetY + t * 85 - Math.sin(t * Math.PI) * 35;
+            ballScale = 0.44 + t * 0.14;
+          }
+        }
+
+        // Draw Ball (only behind striker in idle, or in front once struck)
+        const drawBall = () => {
+          const r = 15 * ballScale;
+          // Shadow
+          sCtx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+          sCtx.beginPath();
+          sCtx.ellipse(ballScreenX, animState.phase === 'idle' || animState.phase === 'runup' ? spotY + 4 : ballScreenY + r + 8, r * 0.9, r * 0.35, 0, 0, Math.PI * 2);
+          sCtx.fill();
+
+          // Sphere
+          const grad = sCtx.createRadialGradient(ballScreenX - r * 0.3, ballScreenY - r * 0.3, r * 0.15, ballScreenX, ballScreenY, r);
+          grad.addColorStop(0, '#ffffff');
+          grad.addColorStop(0.75, '#e2e8f0');
+          grad.addColorStop(1, '#94a3b8');
+          sCtx.fillStyle = grad;
+          sCtx.beginPath();
+          sCtx.arc(ballScreenX, ballScreenY, r, 0, Math.PI * 2);
+          sCtx.fill();
+
+          // Classic Pentagon patches
+          sCtx.fillStyle = '#0f172a';
+          const spin = animState.phase === 'flight' ? now * 0.02 : 0;
+          sCtx.beginPath();
+          sCtx.arc(ballScreenX + Math.cos(spin) * r * 0.2, ballScreenY + Math.sin(spin) * r * 0.2, r * 0.32, 0, Math.PI * 2);
+          sCtx.fill();
+        };
+
+        drawBall();
+
+        // 7. Striker in Foreground (3rd-Person Behind View with Custom Jersey!)
+        drawStrikerBehind(sCtx, spotX, spotY, sKit, strikerKitObj, now);
+        if (appState.match && (appState.match.isSuddenDeath || appState.match.kickIndex >= 8)) {
+          const pv = sCtx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * (0.38 + Math.sin(now * 0.006) * 0.03), w / 2, h / 2, Math.max(w, h) * 0.75);
+          pv.addColorStop(0, 'rgba(0,0,0,0)'); pv.addColorStop(1, 'rgba(0,0,0,0.6)');
+          sCtx.fillStyle = pv; sCtx.fillRect(0, 0, w, h);
+        }
+
+        // 8. Impact Particles
+        for (let i = animState.particles.length - 1; i >= 0; i--) {
+          const p = animState.particles[i];
+          sCtx.fillStyle = p.color;
+          sCtx.globalAlpha = Math.max(0, p.life);
+          sCtx.beginPath();
+          sCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          sCtx.fill();
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.16;
+          p.life -= p.decay;
+          if (p.life <= 0) animState.particles.splice(i, 1);
+        }
+        sCtx.globalAlpha = 1;
+      }
+
+      function drawGoalkeeper(ctx, centerX, goalLineY, goalHalfW, goalH, kKit, keeperKitObj, now) {
+        let kx = centerX;
+        let ky = goalLineY;
+        let tilt = 0;
+        let armSpread = Math.sin(now * 0.005) * 6;
+        let armRaise = 0;
+        let pointDir = 0; // -1 left, +1 right
+        let bounce = Math.abs(Math.sin(now * 0.006)) * 4;
+
+        // Emote overrides in idle
+        let showSpeech = null;
+        if (animState.emote && animState.phase === 'idle') {
+          const elapsed = now - animState.emote.start;
+          if (elapsed < animState.emote.duration) {
+            showSpeech = animState.emote.text;
+            if (animState.emote.id === 'wave') {
+              armRaise = -26 - Math.sin(now * 0.025) * 14;
+              armSpread = 16;
+            } else if (animState.emote.id === 'point') {
+              pointDir = (animState.emote.variant % 2 === 0) ? -1 : 1;
+              kx += pointDir * (14 + Math.sin(now * 0.015) * 5);
+            } else if (animState.emote.id === 'trash') {
+              bounce = Math.abs(Math.sin(now * 0.018)) * 9;
+            }
+          } else {
+            animState.emote = null;
+          }
+        }
+
+        // Dive kinematics during flight/impact
+        if (animState.phase === 'flight' || animState.phase === 'impact') {
+          const t = animState.phase === 'flight'
+            ? Math.min(1, (now - animState.phaseStart) / 480)
+            : 1;
+          const ease = 1 - Math.pow(1 - t, 2);
+          if (animState.keeperDir === 'left') {
+            kx = centerX - ease * goalHalfW * 0.68;
+            ky = goalLineY - Math.sin(ease * Math.PI * 0.75) * 32;
+            tilt = -ease * 1.15;
+            armRaise = -22 * ease;
+          } else if (animState.keeperDir === 'right') {
+            kx = centerX + ease * goalHalfW * 0.68;
+            ky = goalLineY - Math.sin(ease * Math.PI * 0.75) * 32;
+            tilt = ease * 1.15;
+            armRaise = -22 * ease;
+          } else {
+            ky = goalLineY - Math.sin(ease * Math.PI * 0.6) * 26;
+            armRaise = -24 * ease;
+          }
+          bounce = 0;
+        }
+
+        ctx.save();
+        ctx.translate(kx, ky - bounce);
+        ctx.rotate(tilt);
+        ctx.fillStyle = 'rgba(0,0,0,0.38)';
+        ctx.beginPath(); ctx.ellipse(0, bounce, 22, 5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.scale(0.46, 0.46);
+        const r = Math.max(0, -armRaise / 26);
+        let aL = [0.8 + r * 1.8, 0.35], aR = [0.8 + r * 1.8, 0.35];
+        if (pointDir === -1) { aL = [1.55, 0.05]; aR = [-0.3, -0.6]; }
+        else if (pointDir === 1) { aR = [1.55, 0.05]; aL = [-0.3, -0.6]; }
+        const crouchK = animState.phase === 'idle' ? 6 + Math.sin(now * 0.006) * 2 : 0;
+        const trash = showSpeech && animState.emote && animState.emote.id === 'trash';
+        drawPerson(ctx, { view: 'front', kit: kKit, kitObj: keeperKitObj, gloves: '#a3e635', crouch: crouchK,
+          legs: [[0.26, -0.26], [0.26, -0.26]], arms: [aL, aR], mouthOpen: trash, headTilt: trash ? Math.sin(now * 0.02) * 0.12 : 0 });
+        ctx.restore();
+
+        // Emote Speech Bubble above keeper
+        if (showSpeech) {
+          ctx.save();
+          const bx = kx;
+          const by = ky - 112;
+          ctx.font = '800 13px Inter, sans-serif';
+          const tw = ctx.measureText(showSpeech).width + 22;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.roundRect(bx - tw / 2, by - 16, tw, 28, 14);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(bx - 6, by + 12);
+          ctx.lineTo(bx, by + 20);
+          ctx.lineTo(bx + 6, by + 12);
+          ctx.fill();
+
+          ctx.fillStyle = '#0f172a';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(showSpeech, bx, by - 2);
+          ctx.restore();
+        }
+      }
+
+      function drawStrikerBehind(ctx, spotX, spotY, sKit, strikerKitObj, now) {
+        // Positioned slightly behind and left of the penalty spot in foreground
+        let sx = spotX - 42;
+        let sy = spotY + 115;
+        let scale = 1.0;
+        let lean = 0;
+        let legSwing = 0;
+
+        if (animState.phase === 'runup') {
+          const t = Math.min(1, (now - animState.phaseStart) / 560);
+          sx = (spotX - 42) + 30 * t;
+          sy = (spotY + 115) - 72 * t;
+          scale = 1.0 - 0.14 * t;
+          legSwing = Math.sin(t * Math.PI * 5) * 14;
+          lean = 0.08 * t;
+        } else if (animState.phase === 'flight' || animState.phase === 'impact') {
+          sx = spotX - 12;
+          sy = spotY + 43;
+          scale = 0.86;
+          lean = animState.strikerDir === 'left' ? -0.14 : animState.strikerDir === 'right' ? 0.14 : 0.05;
+          legSwing = 16;
+        } else {
+          // Subtle pre-kick breathing/poise
+          sy += Math.sin(now * 0.004) * 2;
+        }
+
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.scale(scale, scale);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+        ctx.beginPath(); ctx.ellipse(0, 6, 36, 10, 0, 0, Math.PI * 2); ctx.fill();
+        const lp = legSwing / 14, kicking = animState.phase === 'flight' || animState.phase === 'impact';
+        const legsS = kicking ? [[0.1, 0], [-0.38, 0.9]] : [[0.1 + lp * 0.16, lp > 0 ? 0.5 : 0], [0.1 - lp * 0.16, lp < 0 ? 0.5 : 0]];
+        const armsS = kicking ? [[0.95, 0.3], [0.5, 0.2]] : [[0.2 + lp * 0.3, 0.2], [0.2 - lp * 0.3, 0.2]];
+        drawPerson(ctx, { view: 'back', kit: sKit, kitObj: strikerKitObj, legs: legsS, arms: armsS, lean: lean });
+        ctx.restore();
+      }
+
+      /* =====================================================================
+         10. VICTORY SPOTLIGHT & 5 ICONIC SYNCHRONIZED CELEBRATIONS
+         ===================================================================== */
+      const CELEB_LABELS = {
+        siuuu: { title: 'SIUUU!', color: 'text-amber-300' },
+        mbappe: { title: 'MBAPPÉ!', color: 'text-cyan-300' },
+        slide: { title: 'KNEE SLIDE!', color: 'text-emerald-300' },
+        calma: { title: 'CALMA, CALMA', color: 'text-purple-300' },
+        cold: { title: 'COLD ❄️', color: 'text-sky-300' }
+      };
+
+      const victoryParticles = [];
+
+      function enterVictoryScreen(winnerRole) {
+        appState.winnerRole = winnerRole;
+        const m = appState.match;
+        const winnerKit = winnerRole === 'host' ? appState.hostKit : appState.guestKit;
+        const localWon = (appState.isHost && winnerRole === 'host') || (!appState.isHost && winnerRole === 'guest');
+
+        sound.playFullTimeWhistle();
+        setTimeout(() => sound.playVictoryFanfare(), 450);
+
+        $('victory-headline').textContent = `${winnerKit.name} WINS!`;
+        $('victory-scoreline').textContent = `FINAL SCORE: ${appState.hostKit.name} ${m.hostScore} – ${m.guestScore} ${appState.guestKit.name}${m.isSuddenDeath ? ' (SUDDEN DEATH)' : ''}`;
+
+        if (localWon) {
+          $('winner-celeb-dock').classList.remove('hidden');
+          $('loser-spectate-pill').classList.add('hidden');
+        } else {
+          $('winner-celeb-dock').classList.add('hidden');
+          $('loser-spectate-pill').classList.remove('hidden');
+          $('loser-winner-name').textContent = winnerKit.name;
+        }
+
+        // Render shootout summary dots
+        const sumWrap = $('victory-summary-dots');
+        sumWrap.innerHTML = '';
+        [
+          { kit: appState.hostKit, hist: m.hostHistory, score: m.hostScore },
+          { kit: appState.guestKit, hist: m.guestHistory, score: m.guestScore }
+        ].forEach(row => {
+          const div = document.createElement('div');
+          div.className = 'flex items-center gap-2';
+          const dotsHtml = row.hist.map(ok =>
+            ok
+              ? '<span class="w-3.5 h-3.5 rounded-full bg-emerald-500 text-slate-950 text-[8px] font-bold inline-flex items-center justify-center">✓</span>'
+              : '<span class="w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-[8px] font-bold inline-flex items-center justify-center">✕</span>'
+          ).join('');
+          div.innerHTML = `<span class="font-bold text-slate-200 w-24 truncate">${row.kit.name} (${row.score})</span><div class="flex items-center gap-1">${dotsHtml}</div>`;
+          sumWrap.appendChild(div);
+        });
+
+        // Reset rematch button
+        appState.localRematchReady = false;
+        appState.remoteRematchReady = false;
+        const rematchBtn = $('btn-rematch');
+        rematchBtn.disabled = false;
+        rematchBtn.textContent = 'REMATCH (KEEP KITS)';
+
+        animState.celeb = null;
+        victoryParticles.length = 0;
+        spawnConfetti(60);
+
+        showScreen('victory');
+      }
+
+      function spawnConfetti(count, icy = false) {
+        const w = window.innerWidth;
+        for (let i = 0; i < count; i++) {
+          victoryParticles.push({
+            x: Math.random() * w,
+            y: -20 - Math.random() * 140,
+            vx: (Math.random() - 0.5) * 2.5,
+            vy: 1.6 + Math.random() * 2.8,
+            size: icy ? 4 + Math.random() * 6 : 5 + Math.random() * 5,
+            rot: Math.random() * Math.PI * 2,
+            icy,
+            color: icy
+              ? ['#e0f2fe', '#7dd3fc', '#bae6fd', '#ffffff'][Math.floor(Math.random() * 4)]
+              : ['#fbbf24', '#34d399', '#38bdf8', '#f43f5e', '#ffffff'][Math.floor(Math.random() * 5)],
+            life: 1.0,
+            decay: icy ? 0.004 : 0.003
+          });
+        }
+      }
+
+      function playCelebrationAnimation(celebId, broadcast = true) {
+        if (broadcast) {
+          sendNet({ type: 'CELEBRATE', celebrationId: celebId });
+        }
+
+        animState.celeb = {
+          id: celebId,
+          start: performance.now(),
+          duration: 3200
+        };
+
+        const meta = CELEB_LABELS[celebId] || CELEB_LABELS.siuuu;
+        const banner = $('celeb-banner');
+        banner.textContent = meta.title;
+        banner.className = `font-display text-6xl sm:text-8xl tracking-widest drop-shadow-[0_8px_30px_rgba(0,0,0,0.9)] text-center animate-banner ${meta.color}`;
+        banner.classList.remove('hidden');
+
+        if (celebId === 'siuuu') {
+          sound.playGoalRoar();
+          setTimeout(() => {
+            victoryCanvas.classList.add('shake-screen');
+            setTimeout(() => victoryCanvas.classList.remove('shake-screen'), 500);
+          }, 520);
+          spawnConfetti(45, false);
+        } else if (celebId === 'cold') {
+          sound.playIceChime();
+          spawnConfetti(85, true);
+        } else if (celebId === 'slide') {
+          sound.playGoalRoar();
+          spawnConfetti(40, false);
+        } else {
+          sound.playClick();
+          spawnConfetti(30, false);
+        }
+      }
+
+      document.querySelectorAll('#winner-celeb-dock button[data-celeb]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          playCelebrationAnimation(btn.dataset.celeb, true);
+        });
+      });
+
+      $('btn-rematch').addEventListener('click', () => {
+        sound.playClick();
+        appState.localRematchReady = true;
+        $('btn-rematch').disabled = true;
+        $('btn-rematch').textContent = 'WAITING FOR OPPONENT...';
+        sendNet({ type: 'REMATCH_REQUEST' });
+        checkRematchStart();
+      });
+
+      function checkRematchStart() {
+        if (appState.localRematchReady && appState.remoteRematchReady) {
+          startMatch();
+        }
+      }
+
+      $('btn-exit-lobby').addEventListener('click', () => {
+        sound.playClick();
+        cleanupPeer();
+        resetToMainMenu();
+      });
+
+      $('btn-modal-home').addEventListener('click', () => {
+        sound.playClick();
+        $('disconnect-modal').classList.add('hidden');
+        cleanupPeer();
+        resetToMainMenu();
+      });
+
+      function resetToMainMenu() {
+        $('btn-create-room').disabled = false;
+        $('create-waiting-box').classList.add('hidden');
+        $('btn-join-room').disabled = false;
+        $('join-waiting-box').classList.add('hidden');
+        clearLobbyError();
+        showScreen('lobby');
+      }
+
+      function drawVictoryStage(now) {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        vCtx.clearRect(0, 0, w, h);
+
+        const winnerKitObj = appState.winnerRole === 'host' ? appState.hostKit : appState.guestKit;
+        const wKit = getKit(winnerKitObj.kitId);
+
+        // Dark Spotlight Backdrop
+        const bg = vCtx.createLinearGradient(0, 0, 0, h);
+        bg.addColorStop(0, '#020617');
+        bg.addColorStop(0.65, '#091529');
+        bg.addColorStop(1, '#042f2e');
+        vCtx.fillStyle = bg;
+        vCtx.fillRect(0, 0, w, h);
+
+        // Sweeping Spotlights
+        const spotAlpha = animState.celeb && animState.celeb.id === 'cold' ? 0.25 : 0.16;
+        const beamColor = animState.celeb && animState.celeb.id === 'cold'
+          ? `rgba(56, 189, 248, ${spotAlpha})`
+          : `rgba(250, 204, 21, ${spotAlpha})`;
+
+        [-1, 1].forEach(side => {
+          vCtx.fillStyle = beamColor;
+          vCtx.beginPath();
+          vCtx.moveTo(w / 2 + side * w * 0.28, 0);
+          vCtx.lineTo(w / 2 + side * w * 0.34, 0);
+          vCtx.lineTo(w / 2 + side * 120, h * 0.85);
+          vCtx.lineTo(w / 2 - side * 120, h * 0.85);
+          vCtx.closePath();
+          vCtx.fill();
+        });
+
+        // Turf Spotlight Circle
+        const floorY = h * 0.72;
+        vCtx.fillStyle = 'rgba(16, 185, 129, 0.18)';
+        vCtx.beginPath();
+        vCtx.ellipse(w / 2, floorY + 12, 165, 36, 0, 0, Math.PI * 2);
+        vCtx.fill();
+
+        // Compute Celebration Pose
+        let px = w / 2;
+        let py = floorY;
+        let scaleX = 1;
+        let scaleY = 1;
+        let tilt = 0;
+        let pose = 'idle';
+        let t = 0;
+
+        if (animState.celeb) {
+          const elapsed = now - animState.celeb.start;
+          t = Math.min(1, elapsed / animState.celeb.duration);
+          if (elapsed >= animState.celeb.duration) {
+            animState.celeb = null;
+          } else {
+            pose = animState.celeb.id;
+          }
+        }
+
+        if (pose === 'siuuu') {
+          if (t < 0.22) {
+            // Jump up + pirouette!
+            const p = t / 0.22;
+            py -= Math.sin(p * Math.PI) * 95;
+            scaleX = Math.cos(p * Math.PI * 2);
+          } else {
+            // Iconic wide-arms landing pose!
+            const land = Math.min(1, (t - 0.22) / 0.12);
+            scaleY = 1 - Math.sin(land * Math.PI) * 0.08;
+          }
+        } else if (pose === 'mbappe') {
+          if (t < 0.18) {
+            py -= Math.sin((t / 0.18) * Math.PI) * 40;
+          } else {
+            tilt = 0.06 * Math.sin(Math.min(1, (t - 0.18) * 3) * Math.PI * 0.5);
+          }
+        } else if (pose === 'slide') {
+          const slideP = Math.min(1, t / 0.55);
+          px = w / 2 - 140 + slideP * 180;
+          py = floorY + 26;
+          tilt = -0.22;
+          if (t < 0.65 && Math.random() < 0.6) {
+            victoryParticles.push({
+              x: px - 20,
+              y: floorY + 8,
+              vx: -2 - Math.random() * 3,
+              vy: -1 - Math.random() * 3,
+              size: 4,
+              color: Math.random() > 0.4 ? '#34d399' : '#fbbf24',
+              life: 0.9,
+              decay: 0.03
+            });
+          }
+        } else if (pose === 'calma') {
+          py += Math.sin(now * 0.008) * 3;
+        } else if (pose === 'cold') {
+          // Shivering!
+          px += Math.sin(now * 0.08) * 3.5;
+          // Icy frost aura
+          const frost = vCtx.createRadialGradient(px, py - 95, 20, px, py - 95, 190);
+          frost.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+          frost.addColorStop(1, 'rgba(56, 189, 248, 0)');
+          vCtx.fillStyle = frost;
+          vCtx.beginPath();
+          vCtx.arc(px, py - 95, 190, 0, Math.PI * 2);
+          vCtx.fill();
+        } else {
+          py += Math.sin(now * 0.004) * 3;
+        }
+
+        // Draw Champion in Custom Jersey
+        drawChampionCharacter(vCtx, px, py, scaleX, scaleY, tilt, pose, t, wKit, winnerKitObj, now);
+
+        // Cold Screen Frost Vignette
+        if (pose === 'cold') {
+          const vig = vCtx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.72);
+          vig.addColorStop(0, 'rgba(56, 189, 248, 0)');
+          vig.addColorStop(1, 'rgba(14, 165, 233, 0.28)');
+          vCtx.fillStyle = vig;
+          vCtx.fillRect(0, 0, w, h);
+        }
+
+        // Confetti & Snowflakes
+        for (let i = victoryParticles.length - 1; i >= 0; i--) {
+          const p = victoryParticles[i];
+          vCtx.save();
+          vCtx.translate(p.x, p.y);
+          vCtx.rotate(p.rot);
+          vCtx.fillStyle = p.color;
+          vCtx.globalAlpha = Math.max(0, p.life);
+          if (p.icy) {
+            vCtx.beginPath();
+            vCtx.arc(0, 0, p.size * 0.5, 0, Math.PI * 2);
+            vCtx.fill();
+          } else {
+            vCtx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.65);
+          }
+          vCtx.restore();
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rot += 0.08;
+          p.life -= p.decay;
+          if (p.life <= 0 || p.y > h + 20) victoryParticles.splice(i, 1);
+        }
+      }
+
+      function drawChampionCharacter(ctx, x, y, scaleX, scaleY, tilt, pose, t, kit, kitObj, now) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(tilt);
+        ctx.scale(scaleX, scaleY);
+
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.beginPath(); ctx.ellipse(0, 6, 46, 11, 0, 0, Math.PI * 2); ctx.fill();
+        let legsC = [[0.07, 0], [0.07, 0]], armsC = [[0.22, 0.12], [0.22, 0.12]], cr = 0, ht = 0;
+        const rub = Math.sin(now * 0.03) * 0.12, pump = Math.sin(now * 0.02) * 0.18;
+        if (pose === 'siuuu') { if (t >= 0.22) { legsC = [[0.3, 0], [0.3, 0]]; armsC = [[1.25, 0.35], [1.25, 0.35]]; } else { legsC = [[0.1, 0.2], [0.1, 0.2]]; armsC = [[0.5, 0.2], [0.5, 0.2]]; cr = 6; } }
+        else if (pose === 'mbappe') { armsC = [[-0.35, -1.05], [-0.35, -1.05]]; ht = 0.14; }
+        else if (pose === 'slide') { legsC = [[0.55, -0.7], [1.0, -1.3]]; cr = 26; armsC = [[2.5 + pump, 0.1], [2.5 - pump, 0.1]]; }
+        else if (pose === 'calma') { armsC = [[-0.55, -0.9], [1.2 + Math.sin(now * 0.015) * 0.25, 0]]; ht = -0.06; }
+        else if (pose === 'cold') { armsC = [[-0.45 + rub, -1.2], [-0.45 - rub, -1.2]]; ht = 0.2; cr = 4; }
+        drawPerson(ctx, { view: 'back', kit: kit, kitObj: kitObj, legs: legsC, arms: armsC, crouch: cr, headTilt: ht });
+        ctx.restore();
+      }
+
+      /* =====================================================================
+         11. MAIN RENDER LOOP & SOUND TOGGLE
+         ===================================================================== */
+      $('mute-btn').addEventListener('click', () => {
+        sound.unlock();
+        const nextMuted = !sound.muted;
+        sound.setMuted(nextMuted);
+        $('mute-icon').textContent = nextMuted ? '🔇' : '🔊';
+        $('mute-label').textContent = nextMuted ? 'Muted' : 'Sound On';
+        if (!nextMuted) sound.playClick();
+      });
+
+      function tick(now) {
+        if (appState.screen === 'game') {
+          drawStadiumScene(now);
+        } else if (appState.screen === 'victory') {
+          drawVictoryStage(now);
+        }
+        requestAnimationFrame(tick);
+      }
+
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
